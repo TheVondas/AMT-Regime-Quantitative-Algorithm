@@ -813,3 +813,253 @@ This plan assumes part-time effort (evenings/weekends). Each week has concrete d
 | 14 | Stage 4 | **Robustness testing** | **Gate: is the system robust?** |
 | 15 | Stage 5 | Broker integration | Automated paper trading pipeline |
 | 16-28 | Stage 5 | **Paper trading (3 months)** | **Final gate: forward performance** |
+
+---
+
+## Appendix
+
+This appendix serves as a living reference for key terminology, structural decisions, and concepts required to understand the project. New entries are added as they arise during development.
+
+---
+
+### A1. Project Directory Layout
+
+The project is split into two top-level concerns: **data** (files, not code) and **src** (code, not files). Everything else is supporting infrastructure.
+
+**`data/`** — No code. Stores data files (CSVs, Parquet) that scripts produce or download.
+
+- **`data/raw/`** — Untouched downloads. The exact data as it came from yfinance or FRED. Never modified — if something goes wrong downstream, you can always reprocess from raw.
+- **`data/processed/`** — Cleaned and aligned data. After taking the raw downloads, handling missing dates, aligning SPY/VIX/yields to the same trading day index, and computing log returns, the result goes here. This is what the rest of the pipeline reads from.
+- **`data/features/`** — Precomputed feature matrices. Once all indicators (RSI, ROC, ATR, etc.) are calculated from processed data, the result is cached here so it doesn't need to be recomputed every time the classifier is retrained.
+
+**`src/`** — All Python code. Each subfolder is a module responsible for one stage of the pipeline.
+
+- **`src/data/`** — Scripts for getting data in and cleaning it. `download.py` pulls SPY/VIX/yields from APIs. `clean.py` aligns dates, forward-fills gaps, computes log returns, and saves to `data/processed/`. These run once (or when updating with new data), not every time a model is trained.
+- **`src/features/`** — Code that takes processed data and computes indicator features. Functions like `compute_roc()`, `compute_rsi()`, `compute_atr()`. Fractional differencing logic lives here too. Input: `data/processed/`. Output: `data/features/`.
+- **`src/labeller/`** — The regime labelling logic. The rule-based system that looks at trend direction + volatility + prior state and assigns one of the 6 regime labels to each day. It does not predict — it defines ground truth from historical data. The classifier learns to replicate these labels.
+- **`src/classifier/`** — Random Forest training and prediction code. Takes the feature matrix (from `src/features/`) and regime labels (from `src/labeller/`), trains the RF model, tunes hyperparameters, and outputs regime probability vectors. This is the ML core.
+- **`src/strategy/`** — Per-regime strategy templates. Each regime gets a strategy class (e.g., `TrendFollowingLong` for Trending Up, `MeanReversion` for Ranging). These take the classifier's regime prediction and current market data and output trade signals: buy, sell, position size, stop level.
+- **`src/backtest/`** — The backtesting engine that ties everything together. Runs through historical data day by day: computes features → runs classifier → selects active strategy → generates signals → tracks positions and PnL. Outputs equity curves, trade logs, performance metrics.
+- **`src/analysis/`** — Code for evaluating whether the system actually works. Fama-French factor regressions, SHAP feature importance, bootstrap confidence intervals, attribution tests (A/B/C/D). Answers "do I have alpha?" not "does the code run?"
+
+**`configs/`** — Configuration files (JSON or YAML). Hyperparameter settings, instrument lists, transaction cost assumptions, optimal fractional differencing d values. Keeps magic numbers out of code so they can be changed without editing Python files.
+
+**`notebooks/`** — Jupyter notebooks for exploration and visualisation. Plotting regime labels on price charts, inspecting SHAP values, comparing backtest results. Exploratory, not production code.
+
+**`tests/`** — Unit tests. Short scripts that verify code correctness. For example: "does `compute_rsi()` return values between 0 and 100?" or "does the labeller never produce a regime lasting fewer than 5 days?" Catches bugs early.
+
+**`planAndStateLog/`** — Project plan, development plan, and STATE.md. No code — project management documents only.
+
+**Data flow through the pipeline:**
+
+```
+src/data/download.py  →  data/raw/
+src/data/clean.py     →  data/processed/
+src/features/         →  data/features/
+src/labeller/         →  data/processed/ (labels)
+src/classifier/       ←  data/features/ + labels  →  predictions
+src/strategy/         ←  predictions  →  signals
+src/backtest/         ←  everything above  →  equity curve, trade log
+src/analysis/         ←  backtest results  →  alpha measurement
+```
+
+Each module reads from the previous module's output. This modularity means you can rerun `src/features/` without redownloading data, or retrain the classifier without recomputing features.
+
+---
+
+### A2. Virtual Environment
+
+A virtual environment is an isolated Python installation for this project specifically. Without one, every `pip install` goes into system-wide Python. This causes two problems: (1) package conflicts between projects, and (2) no way to track which packages this project requires.
+
+A virtual environment creates a self-contained folder (called `venv`) inside the project with its own Python and pip. Packages installed inside it only exist for this project.
+
+**Setup:**
+```bash
+python3 -m venv venv          # creates the environment
+source venv/bin/activate      # activates it (terminal prompt changes)
+pip install pandas numpy      # installs only inside this project
+deactivate                    # switches back to system Python
+```
+
+The `venv/` folder should be added to `.gitignore` — it's local to your machine and should not be committed to the repository. A `requirements.txt` file tracks which packages are needed so anyone (or any machine) can recreate the environment with `pip install -r requirements.txt`.
+
+---
+
+### A3. Data Splits and Overfitting Prevention
+
+**The problem:** If the model sees the same data during training that is later used to evaluate it, performance metrics are meaningless. The model memorised patterns rather than learning generalisable structure. Financial time series make this worse because: (1) structural breaks (2008, 2020, 2022) look like learnable patterns in hindsight but were one-off events, (2) data is sequential — tomorrow depends on today, so random shuffling leaks future information into training.
+
+**Three data sets:**
+
+| Set | Period | Purpose | When touched |
+|-----|--------|---------|--------------|
+| Training | 2006 — varies by fold | Model learns patterns from this data | Every training run |
+| Validation | Varies by fold — up to end of 2021 | Tune hyperparameters, compare features, select best model | During development (Weeks 4-12) |
+| Test (Holdout) | 2022 — 2024 | Final honest evaluation. Touched ONCE | Week 13 only |
+
+**Why three and not two:** With only train/test, every time you tune a hyperparameter and check test performance, you implicitly fit to the test set. After 200 Optuna trials evaluated against test data, your "test" performance is optimistic. The validation set absorbs this. You tune against validation, overfit to it slightly (unavoidable), and test gives the honest number.
+
+**Walk-forward validation (within training/validation period):**
+
+Financial data is sequential, so standard k-fold cross-validation is invalid — it would let the model train on 2015 data and validate on 2012 data, which is future information leaking backward. Walk-forward validation respects temporal ordering:
+
+```
+Fold 1:  Train [2006-2012]  |purge|  Validate [2012-2013]
+Fold 2:  Train [2006-2013]  |purge|  Validate [2013-2014]
+Fold 3:  Train [2006-2014]  |purge|  Validate [2014-2015]
+Fold 4:  Train [2006-2015]  |purge|  Validate [2015-2016]
+Fold 5:  Train [2006-2016]  |purge|  Validate [2016-2017]
+Fold 6:  Train [2006-2017]  |purge|  Validate [2017-2018]
+Fold 7:  Train [2006-2018]  |purge|  Validate [2018-2019]
+Fold 8:  Train [2006-2019]  |purge|  Validate [2019-2020]
+Fold 9:  Train [2006-2020]  |purge|  Validate [2020-2021]
+```
+
+Each fold trains on everything before the validation window and tests on the next unseen period. The training window expands forward. The model never sees the future.
+
+**Purging (PGTS — Purged Group Time Series):**
+
+Between each training and validation window, 5 trading days are discarded from both sets. This prevents leakage from features that use lookback windows. If a 20-day ROC feature on the first day of validation includes price data from the last day of training, information has leaked. The purge gap eliminates this.
+
+**Why the 2006-2021 / 2022-2024 split:**
+
+| Criterion | Status |
+|-----------|--------|
+| Training has multiple market cycles | 2008 GFC, 2011 EU crisis, 2015-16 slowdown, 2018 vol shock, 2020 COVID — yes |
+| Training contains all 6 regime types | Bull runs, crashes, ranging periods, distribution/accumulation phases — yes |
+| Holdout contains multiple cycles | 2022 bear market, 2023-24 recovery — yes |
+| Holdout contains varied regimes | Trending down (early 2022), ranging, trending up (2023-24) — yes, though transition states may be sparse |
+| Training sample count | ~3,800 trading days — well above the minimum ~1,800 (10× features × classes) |
+| Holdout sample count | ~750 trading days — reasonable for strategies with Sortino > 2 |
+| Split ratio | ~80/20 — slightly more training-heavy than 70/30 but defensible given the need for multiple cycles in training |
+
+**Rolling origin evaluation (post-holdout robustness check):**
+
+After the final holdout evaluation, the model is tested on every possible 1-year sliding window within the holdout period. This reveals whether alpha is stable across the holdout or concentrated in one lucky sub-period. Does not require more data — extracts more information from the holdout already available.
+
+**Key academic references:**
+- de Prado, M. López (2018). *Advances in Financial Machine Learning* — CPCV, purging, embargo
+- Harvey, Liu & Zhu (2016). *"...and the Cross-Section of Expected Returns"* — multiple testing, minimum holdout length
+- Pomorski (2024) — PGTS walk-forward validation applied to regime prediction
+
+**The discipline rule:** The 2022-2024 holdout data will exist in `data/raw/` from day one. It must not be fed to any model, evaluated against, or even casually inspected for patterns until Week 13. Peeking and adjusting contaminates the holdout and eliminates the only unbiased performance estimate.
+
+---
+
+### A4. Handling Extreme Macro-Shock Events (GFC, COVID, etc.)
+
+**The tension:** This project is a regime detector. Market crashes are the exact regime transitions the system is designed to detect — so they cannot be excluded. But these events are so extreme (S&P 500 fell 34% in 23 trading days during COVID; multiple 10%+ daily moves) that they distort everything they touch: feature distributions, model training, and performance metrics. A few weeks of March 2020 can dominate the entire loss function, causing the model to learn "how to trade COVID" rather than "how to detect regime changes generally."
+
+The same applies to evaluation. If the system happened to be short going into COVID, the Sortino ratio looks spectacular — not because the system is good, but because one lucky positioning during a 5-sigma event dwarfs everything else.
+
+**The core risk is not that crises exist — it's overfitting to *specific* crises.** COVID was a V-shaped crash and recovery. The GFC was an 18-month grind lower. The 2022 rate shock was a slow-motion repricing. The next crisis will be structurally different from all three. A model that memorises "what happened during COVID" will fail on the next crisis.
+
+**Techniques and how they apply to this project:**
+
+**1. Winsorisation (feature level)**
+
+Cap feature values at the 1st and 99th percentile. Any value beyond the threshold is replaced with the threshold value. This prevents extreme feature spikes (e.g., a 20-day ROC of 500% during COVID) from distorting the feature distribution and dominating RF splits.
+
+- Apply to: feature engineering (Week 2)
+- Do NOT apply to: regime labels — the labeller must see true price magnitude to correctly identify the regime
+- Do NOT apply to: raw price/return data used for backtesting — PnL must reflect reality
+
+**2. ATR-based normalisation (feature level)**
+
+Express features as multiples of ATR rather than raw values. During COVID, ATR expands, so a large absolute move expressed as "2× ATR" is less extreme than the same move in raw points. This is a natural volatility-adaptive scaling that handles crisis periods without explicit outlier treatment.
+
+- Apply to: all AMT features (Week 8) and any feature where absolute magnitude matters
+- Already planned in PROJECT_PLAN.md feature engineering section
+
+**3. Robust performance metrics (evaluation level)**
+
+Use metrics that are less sensitive to outliers:
+
+| Metric | Why it's more robust |
+|--------|---------------------|
+| Sortino ratio (instead of Sharpe) | Only penalises downside volatility — less distorted by large positive outliers |
+| Median return (alongside mean) | Single extreme day doesn't dominate |
+| CVaR / Expected Shortfall | Measures average loss in worst X% of cases, not just the threshold |
+| Win rate per regime | Not dominated by magnitude of individual trades |
+
+- Apply to: all evaluation stages (Weeks 6, 12, 13)
+- Already using Sortino as primary metric
+
+**4. Crisis vs non-crisis period evaluation (evaluation level)**
+
+Report performance separately for:
+
+- Crisis periods (GFC: Sep 2008 – Mar 2009, COVID: Feb – Apr 2020, 2022 rate shock: Jan – Oct 2022)
+- Normal trending periods
+- Ranging periods
+
+This reveals whether alpha is real across market conditions or concentrated in one lucky crisis positioning.
+
+- Apply to: Week 6 (Stage 1 backtest), Week 12 (full system backtest), Week 13 (holdout evaluation)
+- Implementation: tag each trading day as "crisis" or "normal" based on VIX level (VIX > 30 = crisis) or manually defined date ranges, then compute metrics for each group separately
+
+**5. Leave-one-crisis-out evaluation (robustness test)**
+
+Train the model excluding one crisis entirely. Test on that excluded crisis. Repeat for each major crisis. This directly answers: "Can the model handle a crisis it has never seen before?"
+
+```
+Experiment 1: Train without GFC data (exclude Sep 2008 – Mar 2009)  → Evaluate on GFC period
+Experiment 2: Train without COVID data (exclude Feb – Apr 2020)     → Evaluate on COVID period
+Experiment 3: Train without 2022 data (exclude Jan – Oct 2022)      → Evaluate on 2022 period
+```
+
+If the model detects regime changes correctly during crises it never trained on, that is strong evidence of genuine generalisation. If it only works on crises present in training, it memorised those specific events.
+
+- Apply to: Week 14 (robustness testing)
+- Computationally cheap: just three extra training runs
+- This is one of the strongest robustness tests available and is rarely done in practice
+
+**6. Sample weighting (training level)**
+
+Random Forest's `sample_weight` parameter allows controlling how much each training example influences the model. Without weighting, the long 2010-2019 bull run (~2,500 days) dominates training while crash periods (~50-100 days) are barely noticed. Two weighting approaches:
+
+- **Regime-equalised weighting:** weight samples so each regime contributes equally regardless of how many days it spans. Prevents "Trending Up" (60% of training days) from drowning out "Trending Down" (8% of days).
+- **Recency weighting:** exponential decay giving more weight to recent data. Assumes recent market structure is more relevant than 2006 behaviour.
+
+The regime-equalised approach is more aligned with this project's goals — we want the classifier to be equally good at detecting all regimes, not just the most common one.
+
+- Apply to: Week 4-5 (classifier training)
+- Implementation: `class_weight="balanced"` in scikit-learn RF handles the basic case. Custom `sample_weight` array for more control
+- Note: this partially overlaps with `class_weight="balanced"` already planned, but sample weighting gives finer control (e.g., weighting by regime AND recency)
+
+**7. Stress testing (sanity check)**
+
+After training, manually inspect the model's predictions on specific historical dates:
+
+- 15 September 2008 (Lehman Brothers collapse): does the model predict Trending Down?
+- 23 March 2020 (COVID bottom): does the model predict Transition or Ranging After Downtrend?
+- 3 January 2022 (start of rate shock): does the model detect the shift from Trending Up?
+
+If predictions on these dates are nonsensical, the model has a fundamental problem regardless of aggregate metrics.
+
+- Apply to: Week 6 (Stage 1 backtest), Week 13 (holdout evaluation)
+- Implementation: simple lookup — print regime predictions for a list of key historical dates
+
+**What NOT to do:**
+
+- **Do not exclude crisis periods from training or evaluation.** A regime detector that ignores crises is useless when it matters most.
+- **Do not treat crises as a separate asset class or regime.** COVID and the GFC are extreme instances of "Trending Down" and "Transition," not a seventh regime. Adding a "Crisis" regime would have too few samples to learn from and would overfit to historical crises.
+- **Do not evaluate the system only during calm markets.** Reporting "Sortino of 5.0 excluding crisis periods" is dishonest. The system must work across all market conditions.
+
+**Summary of where each technique is applied:**
+
+| Technique | Pipeline stage | When (week) |
+|-----------|---------------|-------------|
+| Winsorisation (1st/99th percentile) | Feature engineering | Week 2 |
+| ATR-based normalisation | Feature engineering | Week 2, Week 8 |
+| Robust metrics (Sortino, median, CVaR) | Evaluation | Weeks 6, 12, 13 |
+| Crisis vs non-crisis performance split | Evaluation | Weeks 6, 12, 13 |
+| Leave-one-crisis-out | Robustness testing | Week 14 |
+| Sample weighting (regime-equalised) | Classifier training | Weeks 4-5 |
+| Stress testing (key date predictions) | Sanity check | Weeks 6, 13 |
+
+**Key academic references:**
+- Mandelbrot, B. (1963). "The Variation of Certain Speculative Prices" — fat tails in financial returns
+- Cont, R. (2001). "Empirical Properties of Asset Returns" — stylised facts of return distributions
+- López de Prado, M. (2018). *Advances in Financial Machine Learning* — sample weighting, cross-validation for rare events
+- Ang, A. & Bekaert, G. (2002). "International Asset Allocation with Regime Shifts" — regime-conditional evaluation
