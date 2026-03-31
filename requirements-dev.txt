@@ -1,0 +1,9 @@
+# DEVELOPMENT DEPENDENCIES
+
+# Meta-tools
+pre-commit
+commitizen
+
+# Formatting & Linting
+black
+ruff
