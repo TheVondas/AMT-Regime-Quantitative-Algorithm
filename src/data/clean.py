@@ -16,6 +16,7 @@ Output columns:
 """
 
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -27,6 +28,7 @@ PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 
 
 # ── Cleaning logic ───────────────────────────────────────────────────────────
+
 
 def load_raw(filename: str) -> pd.DataFrame:
     """Load a raw Parquet file and lowercase column names."""
@@ -79,13 +81,13 @@ def main():
     print(f"  Rows:    {len(df)}")
     print(f"  Columns: {list(df.columns)}")
     print(f"  Range:   {df.index.min().date()} → {df.index.max().date()}")
-    print(f"\nFirst 5 rows:")
+    print("\nFirst 5 rows:")
     print(df.head().to_string())
-    print(f"\nLast 5 rows:")
+    print("\nLast 5 rows:")
     print(df.tail().to_string())
 
     # Summary stats for a quick sanity check
-    print(f"\nSummary statistics:")
+    print("\nSummary statistics:")
     print(df[["close", "vix", "us10y", "us3m", "log_return"]].describe().to_string())
 
 

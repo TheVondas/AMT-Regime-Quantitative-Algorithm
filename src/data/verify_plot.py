@@ -6,9 +6,10 @@ Saves plot to notebooks/verification_plot.png.
 """
 
 from pathlib import Path
-import pandas as pd
-import matplotlib.pyplot as plt
+
 import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
@@ -55,17 +56,29 @@ def main():
         date = pd.Timestamp(date_str)
         for ax in axes:
             ax.axvline(x=date, color="orange", linestyle=":", alpha=0.6)
-        axes[0].annotate(label, xy=(date, df.loc[date:, "close"].iloc[0]),
-                         fontsize=7, color="orange", ha="left",
-                         xytext=(10, 10), textcoords="offset points")
+        axes[0].annotate(
+            label,
+            xy=(date, df.loc[date:, "close"].iloc[0]),
+            fontsize=7,
+            color="orange",
+            ha="left",
+            xytext=(10, 10),
+            textcoords="offset points",
+        )
 
     # Mark the train/holdout split
     split_date = pd.Timestamp("2022-01-01")
     for ax in axes:
         ax.axvline(x=split_date, color="purple", linestyle="--", alpha=0.5)
-    axes[0].annotate("← Train | Holdout →", xy=(split_date, df["close"].max() * 0.95),
-                     fontsize=8, color="purple", ha="center",
-                     xytext=(0, 10), textcoords="offset points")
+    axes[0].annotate(
+        "← Train | Holdout →",
+        xy=(split_date, df["close"].max() * 0.95),
+        fontsize=8,
+        color="purple",
+        ha="center",
+        xytext=(0, 10),
+        textcoords="offset points",
+    )
 
     plt.tight_layout()
     out_path = OUTPUT_DIR / "verification_plot.png"

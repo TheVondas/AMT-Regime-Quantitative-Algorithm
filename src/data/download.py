@@ -13,8 +13,9 @@ Output: one Parquet file per ticker in data/raw/.
 """
 
 from pathlib import Path
-import yfinance as yf
+
 import pandas as pd
+import yfinance as yf
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
@@ -32,6 +33,7 @@ RAW_DIR = Path(__file__).resolve().parents[2] / "data" / "raw"
 
 
 # ── Download logic ───────────────────────────────────────────────────────────
+
 
 def download_ticker(ticker: str, start: str = START_DATE) -> pd.DataFrame:
     """Download daily data for a single ticker from yfinance."""
@@ -62,8 +64,10 @@ def main():
         out_path = RAW_DIR / f"{filename}.parquet"
         df.to_parquet(out_path, engine="pyarrow")
 
-        print(f"    → Saved {out_path.name}  "
-              f"({len(df)} rows, {df.index.min().date()} to {df.index.max().date()})")
+        print(
+            f"    → Saved {out_path.name}  "
+            f"({len(df)} rows, {df.index.min().date()} to {df.index.max().date()})"
+        )
 
     print("\nDone. All raw data saved to", RAW_DIR)
 
