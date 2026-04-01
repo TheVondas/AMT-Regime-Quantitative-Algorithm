@@ -19,7 +19,7 @@ Stage 1, Week 1 complete — data pipeline built and verified. Ready for Week 2 
 - AMT microstructure signals may be attenuated on SPY/ES vs single-name stocks, metals, or crypto — multi-asset robustness testing will validate
 
 ## Known Issues
-- None yet
+- **`ta` library dependency risk:** Single-maintainer package. Momentum features (RSI, ROC, MACD) currently depend on it. CMO is already pure pandas. Consider rewriting all momentum indicators in pure pandas/numpy to eliminate the dependency. Wrapper pattern in `momentum.py` isolates the risk for now — only internal function bodies would change. Decision: revisit before Stage 2, or sooner if `ta` causes issues. Same concern applies to any `ta` usage in trend/volatility/volume features.
 
 ---
 
