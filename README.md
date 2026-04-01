@@ -29,7 +29,19 @@ Install runtime (`requirements.txt`) and development (`requirements-dev.txt`) de
 pip install -r requirements.txt -r requirements-dev.txt
 ```
 
-### 2. Enable pre-commit automation:
+### 2. Local Package Setup
+To ensure imports work consistently across scripts and Jupyter Notebooks, install the project in "editable" mode:
+```bash
+pip install -e .
+```
+This allows you to import logic from the `src` directory from anywhere in the project:
+```Python
+# In a Notebook or Script
+from src.features.momentum import compute_macd
+```
+*Note: Use `%load_ext autoreload` and `%autoreload 2` in Notebooks to automatically pick up changes made to .py files without restarting the kernel.*
+
+### 3. Enable pre-commit automation:
 
 Run these once to set up the automated code linting tools:
 ```bash
@@ -39,7 +51,7 @@ pre-commit install
 pre-commit install --hook-type commit-msg
 ```
 
-### 3. Workflow:
+### 4. Workflow:
 
 #### **Branching**:
 
@@ -71,7 +83,7 @@ We use **Commitizen** (Conventional Commits). Your commits message must start wi
 |`docs:`|Changes to documentation or added comments|`docs: add dev setup to README.md`|
 |`experiment:`|**(Custom)** any experimentation done in notebooks|`experiment: testing vwap strategy in notebooks/vwap_test.ipynb`|
 |`refactor:`|Rewriting code without changing behaviour|`refactor: optimise loop in data loader`|
-|`chore:`|Maitenance (updating libraries, etc.)|`chore: add pandas to requirements.txt`|
+|`chore:`|Maintenance (updating libraries, etc.)|`chore: add pandas to requirements.txt`|
 |`test:`|Adding or updating tests|`test: add tests for getRSI method`|
 
 **Handling "Failed" commits:**
