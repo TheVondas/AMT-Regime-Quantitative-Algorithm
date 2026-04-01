@@ -23,3 +23,6 @@ data/features/
 
 # ruff cache
 .ruff_cache/
+
+# egg-info directory
+amt_regime_quantitative_algorithm.egg-info/
