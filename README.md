@@ -2,7 +2,7 @@
 
 This project builds a quantitative trading system that decomposes financial markets into discrete structural regimes using Auction Market Theory (AMT) and deploys optimised strategies per regime. The core thesis is that markets cycle through identifiable behavioural states — trending, ranging, and transitional — and that strategies tuned to each state will outperform static approaches.
 
-The architecture extends the work of Pomorski (2024), *"Construction of Effective Regime-Switching Portfolios Using a Combination of Machine Learning and Traditional Approaches"* (UCL PhD thesis), which validated a detection-prediction-optimisation pipeline using KAMA+MSR for regime labelling, Random Forest for regime prediction, and Model Predictive Control for portfolio construction. This project diverges from Pomorski by:
+The architecture extends the work of Pomorski (2024), [*"Construction of Effective Regime-Switching Portfolios Using a Combination of Machine Learning and Traditional Approaches"*](https://discovery.ucl.ac.uk/id/eprint/10192012/) (UCL PhD thesis), which validated a detection-prediction-optimisation pipeline using KAMA+MSR for regime labelling, Random Forest for regime prediction, and Model Predictive Control for portfolio construction. This project diverges from Pomorski by:
 
 - Expanding from 4 regimes (volatility × trend) to 6 regimes incorporating directional context and AMT structural states.
 - Grounding regime definitions in Auction Market Theory rather than pure statistical volatility decomposition.
@@ -73,7 +73,6 @@ We use **Commitizen** (Conventional Commits). Your commits message must start wi
 |`refactor:`|Rewriting code without changing behaviour|`refactor: optimise loop in data loader`|
 |`chore:`|Maitenance (updating libraries, etc.)|`chore: add pandas to requirements.txt`|
 |`test:`|Adding or updating tests|`test: add tests for getRSI method`|
-|
 
 **Handling "Failed" commits:**
 
