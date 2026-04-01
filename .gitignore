@@ -20,3 +20,6 @@ data/features/
 # IDE
 .vscode/
 .idea/
+
+# ruff cache
+.ruff_cache/
