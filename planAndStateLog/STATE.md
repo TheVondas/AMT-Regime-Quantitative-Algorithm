@@ -16,6 +16,7 @@ Stage 1, Week 1 complete — data pipeline built and verified. Ready for Week 2 
 - Intraday data source for Stage 2 AMT features: Polygon.io vs Alpaca vs Databento. Decision needed by Week 7
 - Whether to include short strategies or go long-only for v1
 - Futures (ES) vs ETF (SPY) as primary instrument
+- AMT microstructure signals may be attenuated on SPY/ES vs single-name stocks, metals, or crypto — multi-asset robustness testing will validate
 
 ## Known Issues
 - None yet
@@ -55,6 +56,14 @@ Stage 1, Week 1 complete — data pipeline built and verified. Ready for Week 2 
 - **Sample weighting:** Regime-equalised weighting so each regime contributes equally to training regardless of temporal duration
 - **Stress testing:** Perturb features by ±1σ / ±2σ to verify classifier doesn't flip regimes on noise
 - **Key principle:** Never exclude crisis data — these periods contain the highest-value regime transitions. Treat them as signal, not noise
+
+### 2026-04-01 — Multi-asset robustness testing
+- **Primary instrument:** SPY (build and validate the full pipeline here first)
+- **Robustness test instruments:** Individual stocks, metals (e.g. gold/GC), cryptocurrencies (e.g. BTC) — asset classes where AMT microstructure signals are expected to be strongest due to higher volatility and more order-driven price discovery
+- **Purpose:** If the system only works on SPY, it may be overfit to one instrument's statistical properties. Generalisation across asset classes with different microstructure characteristics is stronger evidence of genuine signal
+- **AMT signal strength by asset class (expected):** Single stocks / crypto / metals > ES futures > SPY ETF. ETF arbitrage mechanics and index diversification attenuate raw auction signals on SPY
+- **Practical implication for Stage 2:** Source AMT microstructure data (TPO, delta, volume profile) from ES futures rather than SPY, where genuine price discovery occurs. SPY follows ES, not the other way around (Hasbrouck 2003)
+- **Timing:** Multi-asset testing after the SPY pipeline is validated end-to-end (post-Week 14). Not a blocker for Stages 1-4
 
 ---
 
