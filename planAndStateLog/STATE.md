@@ -3,14 +3,21 @@
 **Last updated:** 2026-04-01
 
 ## Current Stage
-Stage 1, Week 1 complete — data pipeline built and verified. Ready for Week 2 (feature engineering).
+Stage 1, Week 2 in progress — momentum features complete, trend features next.
 
 ## What's Next
 - [x] Write `src/data/download.py` — download SPY, VIX, yields from yfinance ✓
 - [x] Write `src/data/clean.py` — align dates, forward-fill, compute log returns ✓
 - [x] Save to `data/raw/` and `data/processed/` ✓
 - [x] Verification plot: SPY price, VIX, 10Y yield on same time axis ✓
-- [ ] Week 2: Pomorski-style feature engineering (~20 features: momentum, trend, volatility, volume)
+- [x] Week 2 — Momentum features: ROC (4 lookbacks), RSI, CMO, MACD ✓
+- [ ] Week 2 — Trend features: ADX, +DI/-DI, Price/SMA, SMA crossover
+- [ ] Week 2 — Volatility features: ATR, rolling std, VIX change
+- [ ] Week 2 — Volume features: OBV, volume ratio, MFI, Force Index
+- [ ] Week 2 — Stationarity features: rolling ADF
+- [ ] Week 2 — Time-series features: time reversal asymmetry
+- [ ] Week 2 — Macro features: yield level, yield change, yield curve slope
+- [ ] Week 2 — Fractional differencing, 1-day lag, correlation check, save feature matrix
 
 ## Active Concerns
 - Intraday data source for Stage 2 AMT features: Polygon.io vs Alpaca vs Databento. Decision needed by Week 7
@@ -140,3 +147,19 @@ Stage 1, Week 1 complete — data pipeline built and verified. Ready for Week 2 
 - Multi-asset testing is the strongest robustness check — if the system only works on one instrument, it's likely overfit
 - Raw data cleaning should preserve information; transformations belong in the feature engineering pipeline where they can be tuned per feature
 - Git workflow: pull → branch → work → commit → pull again → push → PR → merge. Communicate with Will to avoid working on the same files
+
+### 2026-04-01 — Session 5: Momentum feature engineering
+**What was done:**
+- Created `src/features/momentum.py` — computes 9 momentum features: ROC (21/63/126/252 day), RSI (14-day), CMO (14-day), MACD line/signal/histogram (12/26/9)
+- Created `src/features/verify_momentum.py` — 4-panel verification chart (SPY, RSI, MACD, ROC) with crisis event annotations
+- Verified all features against live data: 5,091 usable rows after 252-day warmup, all values in expected ranges
+- Installed `ta` library (v0.11.0) for technical indicator calculations
+- First full branch-based git workflow executed: created `dom/add-momentum-features`, committed, pushed, created PR, merged on GitHub, pulled back to main
+- Discussed docstring standards (Google-style) and code discoverability — agreed that docstrings + consistent naming + IDE search is preferable to a manual function log
+- Identified `ta` library as a single-maintainer dependency risk — logged in Known Issues. CMO already implemented in pure pandas; RSI, ROC, MACD can be rewritten if needed
+
+**Key takeaways:**
+- Pre-commit hooks caught formatting issues and a too-large PNG (>500KB) — regenerated at lower DPI. These hooks are now part of the workflow
+- `PYTHONPATH=.` needed to run feature scripts until Will's setuptools work is merged
+- Momentum features visually confirmed: RSI drops below 30 during crises, MACD goes deeply negative during sustained downtrends, ROC_252 captures year-over-year extremes (COVID -47%, recovery +77%)
+- Wrapper pattern in momentum.py isolates the `ta` dependency — if the library breaks, only function internals need rewriting, not the rest of the codebase
