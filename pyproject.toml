@@ -1,3 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amt-regime-quantitative-algorithm"
+version = "0.1.0"
+description = "AMT-based Regime-Switching Quantitative Trading System"
+requires-python = ">=3.9"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["*"]
+
 [tool.commitizen]
 name = "cz_conventional_commits"
 version = "0.1.0"
