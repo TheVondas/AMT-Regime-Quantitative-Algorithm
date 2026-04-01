@@ -1,6 +1,6 @@
 # Current Project State
 
-**Last updated:** 2026-03-31
+**Last updated:** 2026-04-01
 
 ## Current Stage
 Stage 1, Week 1 complete — data pipeline built and verified. Ready for Week 2 (feature engineering).
@@ -65,6 +65,15 @@ Stage 1, Week 1 complete — data pipeline built and verified. Ready for Week 2 
 - **Practical implication for Stage 2:** Source AMT microstructure data (TPO, delta, volume profile) from ES futures rather than SPY, where genuine price discovery occurs. SPY follows ES, not the other way around (Hasbrouck 2003)
 - **Timing:** Multi-asset testing after the SPY pipeline is validated end-to-end (post-Week 14). Not a blocker for Stages 1-4
 
+### 2026-04-01 — Collaboration setup with Will Edgington
+- **Contributor:** Will Edgington joined as co-developer
+- **Division:** Dom handles financial/quantitative/market side; Will handles dev tooling, testing infrastructure, setuptools
+- **Dev tooling merged (Will's PRs #1-3):** pre-commit hooks (ruff + black), requirements-dev.txt, commitizen, pyproject.toml, dev setup docs in README
+- **Git workflow agreed:** Branch-based development with pull requests. Pull before branching, pull again before pushing. Push promptly. Communicate who's working on what to avoid duplication
+- **Branch naming:** `dom/<feature-name>` or `will/<feature-name>`
+- **Will's next tasks:** setuptools for clean kernel imports, PyTest setup with unit tests for existing code
+- **Dom's next tasks:** Week 2 feature engineering (indicators)
+
 ---
 
 # Session Log (append-only — one entry per working session)
@@ -115,3 +124,19 @@ Stage 1, Week 1 complete — data pipeline built and verified. Ready for Week 2 
 - Only 1 row dropped in cleaning (first day, no prior close for log return) — data quality is excellent
 - auto_adjust=True in yfinance gives split/dividend-adjusted prices, critical for 20+ year SPY series
 - VIX hit 82.7 during COVID, US 3M T-bill briefly went negative (-0.105) in 2020 — both real phenomena, not data errors
+
+### 2026-04-01 — Session 4: Collaboration setup and architectural discussion
+**What was done:**
+- Pulled and merged Will's PRs #1-3 (pre-commit linting, dev tooling, README updates)
+- Installed dev dependencies (ruff, black, pre-commit, commitizen) and activated pre-commit hook
+- Discussed AMT signal strength across asset classes — SPY/ES may have attenuated microstructure signals vs single stocks, metals, crypto
+- Decided on multi-asset robustness testing post-Week 14 (individual stocks, gold/GC, BTC)
+- Discussed data cleaning methodology — current pipeline is appropriate; transformations (winsorisation, ATR normalisation, fractional differencing) belong at feature engineering stage, not raw data level
+- Established git collaboration workflow with Will: branch-based development, pull requests, communicate work allocation
+- Logged collaboration structure and division of responsibilities
+
+**Key takeaways:**
+- AMT microstructure features (TPO, delta, volume profile) are expected to be weaker on SPY than on single stocks/metals/crypto due to ETF arbitrage and index diversification. Source microstructure data from ES futures for Stage 2
+- Multi-asset testing is the strongest robustness check — if the system only works on one instrument, it's likely overfit
+- Raw data cleaning should preserve information; transformations belong in the feature engineering pipeline where they can be tuned per feature
+- Git workflow: pull → branch → work → commit → pull again → push → PR → merge. Communicate with Will to avoid working on the same files
