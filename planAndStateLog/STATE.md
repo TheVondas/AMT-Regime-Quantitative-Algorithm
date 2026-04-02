@@ -3,7 +3,7 @@
 **Last updated:** 2026-04-01
 
 ## Current Stage
-Stage 1, Week 2 in progress — momentum features complete, trend features next.
+Stage 1, Week 2 in progress — momentum and trend features complete, volatility features next.
 
 ## What's Next
 - [x] Write `src/data/download.py` — download SPY, VIX, yields from yfinance ✓
@@ -11,7 +11,7 @@ Stage 1, Week 2 in progress — momentum features complete, trend features next.
 - [x] Save to `data/raw/` and `data/processed/` ✓
 - [x] Verification plot: SPY price, VIX, 10Y yield on same time axis ✓
 - [x] Week 2 — Momentum features: ROC (4 lookbacks), RSI, CMO, MACD ✓
-- [ ] Week 2 — Trend features: ADX, +DI/-DI, Price/SMA, SMA crossover
+- [x] Week 2 — Trend features: ADX, +DI/-DI, Price/SMA, SMA crossover ✓
 - [ ] Week 2 — Volatility features: ATR, rolling std, VIX change
 - [ ] Week 2 — Volume features: OBV, volume ratio, MFI, Force Index
 - [ ] Week 2 — Stationarity features: rolling ADF
@@ -163,3 +163,19 @@ Stage 1, Week 2 in progress — momentum features complete, trend features next.
 - `PYTHONPATH=.` needed to run feature scripts until Will's setuptools work is merged
 - Momentum features visually confirmed: RSI drops below 30 during crises, MACD goes deeply negative during sustained downtrends, ROC_252 captures year-over-year extremes (COVID -47%, recovery +77%)
 - Wrapper pattern in momentum.py isolates the `ta` dependency — if the library breaks, only function internals need rewriting, not the rest of the codebase
+
+### 2026-04-02 — Session 6: Trend feature engineering
+**What was done:**
+- Pulled Will's setuptools update: `__init__.py` files added, `pyproject.toml` configured, `pip install -e .` now enables clean imports without `PYTHONPATH` workaround
+- Created `src/features/trend.py` — computes 6 trend features: ADX (14-day), +DI (14-day), -DI (14-day), price/SMA(50) ratio, price/SMA(200) ratio, SMA(50)/SMA(200) crossover ratio
+- Created `src/features/verify_trend.py` — 4-panel verification chart (SPY+SMAs, ADX, +DI/-DI, SMA crossover ratio)
+- Verified all features against live data: 5,144 usable rows after 200-day warmup, all values in expected ranges
+- Second full branch-based git workflow: created `dom/add-trend-features`, committed, pushed, PR created and merged
+
+**Key takeaways:**
+- SMA ratios (price/SMA, SMA/SMA) are preferable to raw differences — they normalise across the full price history ($80 in 2005 vs $650 in 2026)
+- SMA crossover expressed as continuous ratio rather than binary flag — preserves information about how established the crossover is
+- ADX is arguably the single most important feature for regime classification — directly measures trend strength regardless of direction
+- +DI/-DI capture the AMT concept of initiative vs responsive activity numerically — when they weave together, neither side controls the auction (ranging)
+- Scripts must be run as modules (`python -m src.features.verify_trend`) not directly (`python src/features/verify_trend.py`) due to import path resolution
+- Pre-commit Black formatting caught on first commit attempt — re-stage and commit again is the standard recovery
