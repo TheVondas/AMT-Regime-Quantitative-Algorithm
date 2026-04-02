@@ -68,8 +68,8 @@ def compute_cmo(close: pd.Series, period: int = 14) -> pd.Series:
     sum_gains = gains.rolling(window=period).sum()
     sum_losses = losses.rolling(window=period).sum()
 
-    cmo = (sum_gains - sum_losses) / (sum_gains + sum_losses) * 100
-    return cmo
+    cmo = (sum_gains - sum_losses).divide(sum_gains + sum_losses) * 100
+    return cmo.fillna(0.0)
 
 
 def compute_macd(
