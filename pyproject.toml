@@ -30,3 +30,6 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]  # E: style, F: errors, I: imports
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
