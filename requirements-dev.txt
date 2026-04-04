@@ -7,3 +7,6 @@ commitizen
 # Formatting & Linting
 black
 ruff
+
+# TDD
+pytest

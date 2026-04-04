@@ -26,3 +26,6 @@ data/features/
 
 # egg-info directory
 amt_regime_quantitative_algorithm.egg-info/
+
+# pytest cache
+.pytest_cache/
