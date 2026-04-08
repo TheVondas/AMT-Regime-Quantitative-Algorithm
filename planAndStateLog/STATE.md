@@ -1,9 +1,9 @@
 # Current Project State
 
-**Last updated:** 2026-04-01
+**Last updated:** 2026-04-08
 
 ## Current Stage
-Stage 1, Week 2 in progress — momentum and trend features complete, volatility features next.
+Stage 1, Week 2 in progress — momentum, trend, and volatility features complete, volume features next.
 
 ## What's Next
 - [x] Write `src/data/download.py` — download SPY, VIX, yields from yfinance ✓
@@ -12,7 +12,7 @@ Stage 1, Week 2 in progress — momentum and trend features complete, volatility
 - [x] Verification plot: SPY price, VIX, 10Y yield on same time axis ✓
 - [x] Week 2 — Momentum features: ROC (4 lookbacks), RSI, CMO, MACD ✓
 - [x] Week 2 — Trend features: ADX, +DI/-DI, Price/SMA, SMA crossover ✓
-- [ ] Week 2 — Volatility features: ATR, rolling std, VIX change
+- [x] Week 2 — Volatility features: ATR, rolling std, VIX, VIX change ✓
 - [ ] Week 2 — Volume features: OBV, volume ratio, MFI, Force Index
 - [ ] Week 2 — Stationarity features: rolling ADF
 - [ ] Week 2 — Time-series features: time reversal asymmetry
@@ -179,3 +179,18 @@ Stage 1, Week 2 in progress — momentum and trend features complete, volatility
 - +DI/-DI capture the AMT concept of initiative vs responsive activity numerically — when they weave together, neither side controls the auction (ranging)
 - Scripts must be run as modules (`python -m src.features.verify_trend`) not directly (`python src/features/verify_trend.py`) due to import path resolution
 - Pre-commit Black formatting caught on first commit attempt — re-stage and commit again is the standard recovery
+
+### 2026-04-08 — Session 7: Volatility feature engineering
+**What was done:**
+- Pulled Will's PyTest setup: `conftest.py`, unit tests for download, clean, momentum, and trend modules, pytest added to `requirements-dev.txt`
+- Created `src/features/volatility.py` — computes 7 volatility features: ATR (14-day, 30-day) as percentage of close, rolling std of returns (20-day, 60-day), VIX level, VIX 5-day absolute change, VIX 5-day percentage change
+- Created `src/features/verify_volatility.py` — 4-panel verification chart (SPY, ATR%, rolling std, VIX + VIX change)
+- Verified all features against live data: 5,284 usable rows after 60-day warmup, all values in expected ranges
+- Third full branch-based git workflow: created `dom/add-volatility-features`, committed, pushed, PR created and merged
+
+**Key takeaways:**
+- ATR expressed as percentage of close (ATR/close × 100) for comparability across 20-year price history — same normalisation principle as SMA ratios in trend features
+- VIX percentage change added alongside absolute change — a +5 point VIX move from 12 (42% spike) is very different from +5 from 40 (12.5%). BorutaSHAP will determine which representation the classifier prefers
+- Realised volatility (ATR, rolling std) vs implied volatility (VIX) capture different information — ATR/std measure what happened, VIX measures what the market expects. Both needed
+- VIX column exists in both `daily.parquet` and volatility features — must avoid duplication when assembling the final feature matrix
+- COVID ATR peaked at ~8% of price daily, VIX spiked 213% in 5 days — confirms extreme event data is captured correctly
