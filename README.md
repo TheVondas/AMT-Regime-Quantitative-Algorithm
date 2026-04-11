@@ -16,53 +16,41 @@ The predicted edge is structural alpha from two sources: (1) improved regime tra
 
 ## Development Setup
 
-### 0. Setup virtual environment (optional but greatly recommended):
+### 1. Environment & Dependencies
+This project requires **Python 3.9+**. Using a virtual environment is highly recommended to keep dependencies isolated.
 
-```bash
+```Bash
 python -m venv venv
-venv\Scripts\activate
+
+# Activate the environment:
+source venv/bin/activate       # Linux/macOS (Bash/zsh)
+venv\Scripts\activate          # Windows (cmd)
 ```
 
-### 1. Install dependencies:
-Install runtime (`requirements.txt`) and development (`requirements-dev.txt`) dependencies
-```bash
-pip install -r requirements.txt -r requirements-dev.txt
-```
+#### Install Project and Tooling:
+We use an "editable" install so that the `src` module is available globally within your environment.
 
-### 2. Local Package Setup
-To ensure imports work consistently across scripts and Jupyter Notebooks, install the project in "editable" mode:
-```bash
-pip install -e .
+```Bash
+pip install -e .               # Installs project + runtime dependencies
+pip install -r requirements-dev.txt  # Installs pytest, ruff, black, etc.
 ```
-This allows you to import logic from the `src` directory from anywhere in the project:
-```Python
-# In a Notebook or Script
-from src.features.momentum import compute_macd
-```
-*Note: Use `%load_ext autoreload` and `%autoreload 2` in Notebooks to automatically pick up changes made to .py files without restarting the kernel.*
+*Note: Runtime dependencies (`pandas`, `ta`, `yfinance`, etc.) are handled automatically by `pyproject.toml`. You do not need to install `requirements.txt` manually.*
 
-### 3. Enable pre-commit automation:
+### 2. Enable Quality Automation
+We use `pre-commit` to ensure code remains clean and follows professional standards before it reaches the repository.
 
-Run these once to set up the automated code linting tools:
-```bash
+```Bash
 pre-commit install
-
-# Install commitizen commit message pre-commit check
-pre-commit install --hook-type commit-msg
+pre-commit install --hook-type commit-msg # activate Commitizen checks
 ```
 
-### 4. Workflow:
+### 3. Workflow:
 
-#### **Branching**:
+#### **Branching & PR**:
 
-To keep the `main` branch stable, please develop in a separate branch (e.g. `feature/add-rsi`):
-```bash
-git checkout -b branch-type/descriptive-name
-
-# After making changes, push your branch to GitHub
-git push -u origin branch-type/descriptive-name
-```
-*Once your branch is pushed, you can open a **Pull Request** on GitHub for us to review and merge the code.*
+1. **Branch:** Create a descriptively named branch: `git checkout -b <your-name>/<description>` (e.g., `will/set-up-setuptools`).
+2. **Test:** Run `pytest` locally to catch math or logic errors before pushing.
+3. **Push & PR:** git push -u origin <branch-name>. Open a Pull Request on GitHub for review.
 
 #### **Commits**:
 We use automated tools to keep the code clean and our history organised. When you run `git commit`, several checks will run:
