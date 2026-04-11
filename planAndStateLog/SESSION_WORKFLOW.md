@@ -185,7 +185,11 @@ Add a session log entry with:
 - **What was done** — bullet points of concrete deliverables
 - **Key takeaways** — insights, decisions, risks discovered, deviations from plan
 
-Update the mutable sections (Current Stage, What's Next, Active Concerns, Known Issues) as needed.
+Update the mutable sections:
+- **Current Stage** — reflect where the project now stands
+- **What's Next** — tick off completed items, add new ones if scope has changed
+- **Active Concerns** — add new concerns, resolve or remove any that have been addressed
+- **Known Issues** — add any new dependency risks, bugs, or technical debt identified during the session's error and risk analysis (Section 2.2). Remove entries that have been fully resolved. This section is the project's living risk register — keep it current
 
 ### 4.2 Update DEVELOPMENT_PLAN.md
 
@@ -223,6 +227,7 @@ If your session's work affects anything Will is working on, or if you've identif
 [ ] Create PR on GitHub, review, merge
 [ ] git checkout main && git pull origin main
 [ ] Update STATE.md with session log
+[ ] Review and update Known Issues and Active Concerns in STATE.md
 [ ] Update DEVELOPMENT_PLAN.md — tick off completed tasks
 [ ] Commit and push STATE.md and DEVELOPMENT_PLAN.md
 [ ] Communicate with Will if needed
