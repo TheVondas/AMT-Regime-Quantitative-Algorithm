@@ -1,9 +1,9 @@
 # Current Project State
 
-**Last updated:** 2026-04-11
+**Last updated:** 2026-04-12
 
 ## Current Stage
-Stage 1, Week 2 in progress — momentum, trend, volatility, and volume features complete. Stationarity, time-series, and macro features next.
+Stage 1, Week 2 in progress — momentum, trend, volatility, volume, and stationarity features complete. Time-series and macro features next.
 
 ## What's Next
 - [x] Write `src/data/download.py` — download SPY, VIX, yields from yfinance ✓
@@ -14,7 +14,7 @@ Stage 1, Week 2 in progress — momentum, trend, volatility, and volume features
 - [x] Week 2 — Trend features: ADX, +DI/-DI, Price/SMA, SMA crossover ✓
 - [x] Week 2 — Volatility features: ATR, rolling std, VIX, VIX change ✓
 - [x] Week 2 — Volume features: OBV ROC, volume ratio, MFI, normalised Force Index ✓
-- [ ] Week 2 — Stationarity features: rolling ADF
+- [x] Week 2 — Stationarity features: rolling ADF ✓
 - [ ] Week 2 — Time-series features: time reversal asymmetry
 - [ ] Week 2 — Macro features: yield level, yield change, yield curve slope
 - [ ] Week 2 — Fractional differencing, 1-day lag, correlation check, save feature matrix
@@ -238,3 +238,22 @@ Stage 1, Week 2 in progress — momentum, trend, volatility, and volume features
 - After merge, confirm the Discord notification fires correctly — if not, debug the awk parsing or webhook configuration
 - With SESSION_WORKFLOW.md merged, both contributors have a single reference for session procedures going forward
 - Next session should begin the remaining Week 2 features: stationarity (rolling ADF), time-series (time reversal asymmetry), and macro (yield level, yield change, yield curve slope)
+
+### 2026-04-12 — Session 11: Stationarity feature engineering
+**What was done:**
+- Followed SESSION_WORKFLOW.md initialisation procedure: reviewed STATE.md, DEVELOPMENT_PLAN.md, PROJECT_PLAN.md, pulled latest main, created `dom/add-stationarity-features` branch
+- Created `src/features/stationarity.py` — computes 2 stationarity features: rolling ADF test statistic (252-day window) and rolling ADF p-value (252-day window) on log returns
+- Created `src/features/verify_stationarity.py` — 3-panel verification chart (SPY, ADF statistic with critical value lines, ADF p-value with significance thresholds)
+- Installed `statsmodels` (v0.14.6) in the virtual environment — new dependency for the ADF test (also pulls `scipy` and `patsy`)
+- Verified all features against live data: 5,092 usable rows after 252-day warmup, ADF statistics range from -21.9 to -0.15, p-values from ~0 to 0.94
+- Conducted full error and risk analysis per SESSION_WORKFLOW.md Section 2.2: NaN handling, zero-variance guard, dependency assessment, stationarity check, deviation check
+- Fifth full branch-based git workflow: created branch, committed, pushed, PR created and merged
+
+**Key takeaways:**
+- Rolling ADF provides a direct statistical signal for "is the market trending or mean-reverting?" — complementing ADX (price-action-based trend strength) with formal econometric testing
+- ADF statistic is strongly negative (< -15) most of the time, meaning daily returns are typically stationary — but rises toward zero during sustained trending periods (GFC crash, COVID drop, 2022 rate shock), exactly when the series behaves more like a random walk with drift
+- P-value spikes to ~0.94 during certain windows confirm the ADF test correctly identifies non-stationary (trending) episodes — these align visually with major directional moves on the price chart
+- `regression="c"` (constant, no trend) is the correct specification for returns — returns may have a non-zero mean but should not have a deterministic time trend
+- `statsmodels` is NumFOCUS-sponsored with multiple maintainers — much lower dependency risk than `ta`. No wrapper pattern needed
+- `statsmodels` needs to be added to `requirements.txt` to keep dependency tracking current
+- Next session: time-series features (time reversal asymmetry at lags 1, 2, 3)
