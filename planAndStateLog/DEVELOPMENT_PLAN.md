@@ -59,27 +59,27 @@ This plan assumes part-time effort (evenings/weekends). Each week has concrete d
 
 **Tasks:**
 
-- [ ] Implement momentum features:
+- [x] Implement momentum features:
   - ROC (Rate of Change) at 21, 63, 126, 252 day lookbacks (≈ 1M, 3M, 6M, 12M)
   - RSI (14-day)
   - CMO (Chande Momentum Oscillator, 14-day)
   - MACD (12/26/9)
-- [ ] Implement trend features:
+- [x] Implement trend features:
   - ADX (14-day)
   - Plus DI / Minus DI (14-day)
   - Price vs SMA(50), price vs SMA(200)
   - SMA(50) vs SMA(200) crossover flag
-- [ ] Implement volatility features:
+- [x] Implement volatility features:
   - ATR (14-day, 30-day)
   - Rolling standard deviation of returns (20-day, 60-day)
   - VIX level (already in data)
   - VIX 5-day change
-- [ ] Implement volume features:
+- [x] Implement volume features:
   - OBV (On-Balance Volume)
   - Volume ratio: current volume / 20-day average volume
   - MFI (Money Flow Index, 14-day)
   - Force Index (13-day EMA)
-- [ ] Implement stationarity features:
+- [x] Implement stationarity features:
   - Rolling ADF test statistic (252-day window) — this is slow, compute once and cache
   - Rolling ADF p-value (252-day window)
 - [ ] Implement time-series features:

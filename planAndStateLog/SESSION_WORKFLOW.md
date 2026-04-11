@@ -187,17 +187,21 @@ Add a session log entry with:
 
 Update the mutable sections (Current Stage, What's Next, Active Concerns, Known Issues) as needed.
 
-### 4.2 Commit and Push STATE.md
+### 4.2 Update DEVELOPMENT_PLAN.md
+
+Tick off any completed tasks in the week-by-week checklist. This keeps the plan in sync with actual progress so either contributor can see at a glance what's done and what remains.
+
+### 4.3 Commit and Push STATE.md and DEVELOPMENT_PLAN.md
 
 ```bash
-git add planAndStateLog/STATE.md
+git add planAndStateLog/STATE.md planAndStateLog/DEVELOPMENT_PLAN.md
 git commit -m "docs: log session N — brief description"
 git push origin main
 ```
 
 This triggers the Discord notification to Will with the session summary.
 
-### 4.3 Communicate with Will
+### 4.4 Communicate with Will
 
 If your session's work affects anything Will is working on, or if you've identified tasks for him, mention it in Discord directly in addition to the automated notification.
 
@@ -219,6 +223,7 @@ If your session's work affects anything Will is working on, or if you've identif
 [ ] Create PR on GitHub, review, merge
 [ ] git checkout main && git pull origin main
 [ ] Update STATE.md with session log
-[ ] Commit and push STATE.md
+[ ] Update DEVELOPMENT_PLAN.md — tick off completed tasks
+[ ] Commit and push STATE.md and DEVELOPMENT_PLAN.md
 [ ] Communicate with Will if needed
 ```
