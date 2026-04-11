@@ -225,3 +225,16 @@ Stage 1, Week 2 in progress — momentum, trend, volatility, and volume features
 - Workflow triggers only on push to main with changes to `planAndStateLog/STATE.md` — no false notifications from other file changes
 - Will now receives automatic session summaries in Discord without checking the repo manually
 - SESSION_WORKFLOW.md ensures consistency as the project scales — new sessions follow the same due process regardless of who is working
+
+### 2026-04-11 — Session 10: Session workflow finalisation and PR cleanup
+**What was done:**
+- Committed and pushed `planAndStateLog/SESSION_WORKFLOW.md` — was created in Session 9 but left unstaged
+- Updated Session 9 log entry to include SESSION_WORKFLOW.md alongside the Discord notification workflow
+- Pushed all outstanding work on `dom/add-discord-notification` branch for PR review
+- Merging this PR will serve as the first live test of the Discord notification workflow — the STATE.md change should trigger the GitHub Action and send a session summary embed to the project Discord channel
+
+**Key takeaways:**
+- All Session 9 deliverables (Discord workflow + SESSION_WORKFLOW.md) are now bundled in a single PR for clean review
+- After merge, confirm the Discord notification fires correctly — if not, debug the awk parsing or webhook configuration
+- With SESSION_WORKFLOW.md merged, both contributors have a single reference for session procedures going forward
+- Next session should begin the remaining Week 2 features: stationarity (rolling ADF), time-series (time reversal asymmetry), and macro (yield level, yield change, yield curve slope)
