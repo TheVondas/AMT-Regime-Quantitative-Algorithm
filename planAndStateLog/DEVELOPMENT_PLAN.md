@@ -85,9 +85,9 @@ This plan assumes part-time effort (evenings/weekends). Each week has concrete d
 - [x] Implement time-series features:
   - Time reversal asymmetry statistic at lags 1, 2, 3
   - (Optional: energy ratio by chunks from tsfresh — skipped for now, revisit at checkpoint)
-- [ ] Implement macro features:
-  - 10Y yield level, 10Y yield 20-day change
-  - Yield curve slope: 10Y - 2Y
+- [x] Implement macro features:
+  - 10Y yield level, 10Y yield 20-day change (+ percentage change)
+  - Yield curve slope: 10Y-3M and 10Y-5Y (substituted for 10Y-2Y — see Session 3/13)
 - [ ] Apply fractional differencing to non-stationary features:
   - Use `fracdiff` package or implement López de Prado's fixed-width window method
   - For each feature: find minimum d such that the series passes ADF test at 5% significance

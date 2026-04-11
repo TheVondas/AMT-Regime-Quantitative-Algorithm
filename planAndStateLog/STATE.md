@@ -1,9 +1,9 @@
 # Current Project State
 
-**Last updated:** 2026-04-12
+**Last updated:** 2026-04-13
 
 ## Current Stage
-Stage 1, Week 2 in progress — momentum, trend, volatility, volume, stationarity, and time-series features complete. Macro features and pipeline assembly next.
+Stage 1, Week 2 in progress — all 7 feature categories complete (momentum, trend, volatility, volume, stationarity, time-series, macro). Pipeline assembly next (fractional differencing, 1-day lag, correlation check, save feature matrix).
 
 ## What's Next
 - [x] Write `src/data/download.py` — download SPY, VIX, yields from yfinance ✓
@@ -16,7 +16,7 @@ Stage 1, Week 2 in progress — momentum, trend, volatility, volume, stationarit
 - [x] Week 2 — Volume features: OBV ROC, volume ratio, MFI, normalised Force Index ✓
 - [x] Week 2 — Stationarity features: rolling ADF ✓
 - [x] Week 2 — Time-series features: time reversal asymmetry ✓
-- [ ] Week 2 — Macro features: yield level, yield change, yield curve slope
+- [x] Week 2 — Macro features: yield level, yield change, yield curve slope ✓
 - [ ] Week 2 — Fractional differencing, 1-day lag, correlation check, save feature matrix
 
 ## Active Concerns
@@ -277,3 +277,21 @@ Stage 1, Week 2 in progress — momentum, trend, volatility, volume, stationarit
 - Lag 1 and lag 2 are correlated but not redundant — BorutaSHAP will determine if both are needed
 - Project review identified a Week 2 completion checkpoint: write tests for all feature modules, audit requirements.txt, reconcile DEVELOPMENT_PLAN with actual implementations, add numerical assertions to pipeline assembly
 - Next session: macro features (yield level, yield change, yield curve slope) — the final feature category before pipeline assembly
+
+### 2026-04-13 — Session 13: Macro feature engineering
+**What was done:**
+- Created `src/features/macro.py` — computes 5 macro features: 10Y yield level (passthrough), 10Y yield 20-day absolute change, 10Y yield 20-day percentage change, yield curve slope 10Y-3M, yield curve slope 10Y-5Y
+- Created `src/features/verify_macro.py` — 4-panel verification chart (SPY, 10Y yield + 20d change, 10Y-3M slope with inversion shading, 10Y-5Y slope with inversion shading)
+- Verified all features against live data: 5,323 usable rows after 20-day warmup, all values in expected ranges
+- Conducted full error and risk analysis: no division-by-zero risk (10Y yield minimum 0.499%), non-stationarity of yield level noted for fractional differencing, no external dependencies, deviation from plan documented (10Y-3M and 10Y-5Y substituted for 10Y-2Y)
+- Seventh full branch-based git workflow: created `dom/add-macro-features`, committed, pushed, PR created and merged
+- All 7 feature categories now complete: momentum (9), trend (6), volatility (7), volume (4), stationarity (2), time-series (3), macro (5) = 36 features total
+
+**Key takeaways:**
+- Yield curve inversion shading on the verification plot clearly confirms the 10Y-3M spread inverted before GFC (2006-2007), briefly in 2019, and deeply in 2022-2023 — all preceding or concurrent with major equity regime shifts. This is strong visual validation
+- 10Y-2Y slope from DEVELOPMENT_PLAN replaced with 10Y-3M (Fed's preferred recession indicator) and 10Y-5Y due to yfinance data availability. This deviation was already identified in Session 3
+- Added `us10y_pct_change_20d` alongside absolute change, following the same VIX normalisation logic from Session 7 — percentage change normalises for the yield level
+- `us10y` passthrough duplicates the column in `daily.parquet` — must deduplicate at pipeline assembly (same issue as VIX in volatility features)
+- `us10y` level is non-stationary and will need fractional differencing treatment in the pipeline assembly step
+- Pure pandas implementation — zero external dependency risk
+- Next session: pipeline assembly (fractional differencing, 1-day lag, correlation check, save feature matrix) plus Week 2 completion checkpoint (tests, requirements audit, DEVELOPMENT_PLAN reconciliation)
