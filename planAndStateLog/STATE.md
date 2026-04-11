@@ -1,9 +1,9 @@
 # Current Project State
 
-**Last updated:** 2026-04-08
+**Last updated:** 2026-04-11
 
 ## Current Stage
-Stage 1, Week 2 in progress — momentum, trend, and volatility features complete, volume features next.
+Stage 1, Week 2 in progress — momentum, trend, volatility, and volume features complete. Stationarity, time-series, and macro features next.
 
 ## What's Next
 - [x] Write `src/data/download.py` — download SPY, VIX, yields from yfinance ✓
@@ -13,7 +13,7 @@ Stage 1, Week 2 in progress — momentum, trend, and volatility features complet
 - [x] Week 2 — Momentum features: ROC (4 lookbacks), RSI, CMO, MACD ✓
 - [x] Week 2 — Trend features: ADX, +DI/-DI, Price/SMA, SMA crossover ✓
 - [x] Week 2 — Volatility features: ATR, rolling std, VIX, VIX change ✓
-- [ ] Week 2 — Volume features: OBV, volume ratio, MFI, Force Index
+- [x] Week 2 — Volume features: OBV ROC, volume ratio, MFI, normalised Force Index ✓
 - [ ] Week 2 — Stationarity features: rolling ADF
 - [ ] Week 2 — Time-series features: time reversal asymmetry
 - [ ] Week 2 — Macro features: yield level, yield change, yield curve slope
@@ -194,3 +194,20 @@ Stage 1, Week 2 in progress — momentum, trend, and volatility features complet
 - Realised volatility (ATR, rolling std) vs implied volatility (VIX) capture different information — ATR/std measure what happened, VIX measures what the market expects. Both needed
 - VIX column exists in both `daily.parquet` and volatility features — must avoid duplication when assembling the final feature matrix
 - COVID ATR peaked at ~8% of price daily, VIX spiked 213% in 5 days — confirms extreme event data is captured correctly
+
+### 2026-04-11 — Session 8: Volume feature engineering
+**What was done:**
+- Created `src/features/volume.py` — computes 4 volume features: OBV rate of change (21-day), volume ratio (vs 20-day avg), MFI (14-day), normalised Force Index (13-day EMA)
+- Created `src/features/verify_volume.py` — 4-panel verification chart (SPY, OBV ROC, MFI, volume ratio + Force Index)
+- Identified and fixed two stationarity/scaling bugs before committing:
+  - Raw OBV replaced with OBV rate of change — raw OBV is cumulative (~0 to ~17B over 20 years), classifier would learn time-dependent thresholds. ROC captures the actual signal (is volume flowing in or out?)
+  - Raw Force Index replaced with normalised version — raw Force Index scales with price × volume (~8x larger in 2026 vs 2005). Normalised by (close × 20-day avg volume) to produce a dimensionless, time-comparable measure
+- Verified all features against live data: 5,322 usable rows after warmup
+- Fourth full branch-based git workflow: created `dom/add-volume-features`, committed, pushed, PR created
+
+**Key takeaways:**
+- Non-stationary features are a critical risk — they cause the classifier to learn what year it is, not what the market is doing. OBV and Force Index required explicit normalisation beyond what fractional differencing would handle
+- Volume ratio is the cleanest volume feature — self-normalising by construction, no stationarity or scaling issues, and potentially a leading indicator of regime transitions
+- MFI adds volume weighting to the RSI concept — divergence between price (near highs) and MFI (declining) is an early distribution signal
+- Force Index negative mean (-0.0004) confirms "markets take the stairs up and the elevator down" — selling days are slightly more forceful than buying days
+- Same `ta` library dependency risk applies to volume features (OBV, MFI, Force Index use `ta`). Volume ratio is pure pandas
