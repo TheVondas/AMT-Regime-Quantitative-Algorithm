@@ -295,3 +295,12 @@ Stage 1, Week 2 in progress — all 7 feature categories complete (momentum, tre
 - `us10y` level is non-stationary and will need fractional differencing treatment in the pipeline assembly step
 - Pure pandas implementation — zero external dependency risk
 - Next session: pipeline assembly (fractional differencing, 1-day lag, correlation check, save feature matrix) plus Week 2 completion checkpoint (tests, requirements audit, DEVELOPMENT_PLAN reconciliation)
+
+### 2026-04-11 — Session 14: `requirements.txt` reorginisation and improvements to dev setup in `README.md`
+**What was done:**
+- Refactored dependency management: pruned `requirements.txt` to only include necessary runtime dependencies with more lenient versioning.
+- Updated `README.md` with streamlined development setup instructions, including support for Ubuntu/Bash/zsh environments.
+
+**Key takeaways:**
+- replacing `pip freeze` constructed `requirements.txt` with a manually updated `requirements.txt` that only includes explicitly used runtime dependencies with version constraints only where necessary allows for repo to work on python version 3.9+.
+- A few quality of life improvements to the dev set up section in README.md, for example including `source venv/bin/activate` for linux/macOs terminal users.
