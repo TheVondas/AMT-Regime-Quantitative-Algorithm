@@ -82,9 +82,9 @@ This plan assumes part-time effort (evenings/weekends). Each week has concrete d
 - [x] Implement stationarity features:
   - Rolling ADF test statistic (252-day window) — this is slow, compute once and cache
   - Rolling ADF p-value (252-day window)
-- [ ] Implement time-series features:
+- [x] Implement time-series features:
   - Time reversal asymmetry statistic at lags 1, 2, 3
-  - (Optional: energy ratio by chunks from tsfresh — add if time permits)
+  - (Optional: energy ratio by chunks from tsfresh — skipped for now, revisit at checkpoint)
 - [ ] Implement macro features:
   - 10Y yield level, 10Y yield 20-day change
   - Yield curve slope: 10Y - 2Y

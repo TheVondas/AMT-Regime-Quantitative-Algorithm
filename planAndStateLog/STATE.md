@@ -3,7 +3,7 @@
 **Last updated:** 2026-04-12
 
 ## Current Stage
-Stage 1, Week 2 in progress — momentum, trend, volatility, volume, and stationarity features complete. Time-series and macro features next.
+Stage 1, Week 2 in progress — momentum, trend, volatility, volume, stationarity, and time-series features complete. Macro features and pipeline assembly next.
 
 ## What's Next
 - [x] Write `src/data/download.py` — download SPY, VIX, yields from yfinance ✓
@@ -15,7 +15,7 @@ Stage 1, Week 2 in progress — momentum, trend, volatility, volume, and station
 - [x] Week 2 — Volatility features: ATR, rolling std, VIX, VIX change ✓
 - [x] Week 2 — Volume features: OBV ROC, volume ratio, MFI, normalised Force Index ✓
 - [x] Week 2 — Stationarity features: rolling ADF ✓
-- [ ] Week 2 — Time-series features: time reversal asymmetry
+- [x] Week 2 — Time-series features: time reversal asymmetry ✓
 - [ ] Week 2 — Macro features: yield level, yield change, yield curve slope
 - [ ] Week 2 — Fractional differencing, 1-day lag, correlation check, save feature matrix
 
@@ -257,3 +257,23 @@ Stage 1, Week 2 in progress — momentum, trend, volatility, volume, and station
 - `statsmodels` is NumFOCUS-sponsored with multiple maintainers — much lower dependency risk than `ta`. No wrapper pattern needed
 - `statsmodels` needs to be added to `requirements.txt` to keep dependency tracking current
 - Next session: time-series features (time reversal asymmetry at lags 1, 2, 3)
+
+### 2026-04-12 — Session 12: Time-series feature engineering and project review
+**What was done:**
+- Created `src/features/timeseries.py` — computes 3 time-series features: time reversal asymmetry statistic at lags 1, 2, 3 (rolling 252-day window on log returns)
+- Created `src/features/verify_timeseries.py` — 3-panel verification chart (SPY, TRA lag 1 + lag 2 overlaid, TRA lag 3)
+- Verified all features against live data: 5,089 usable rows after warmup, values order 1e-6 (products of log returns), no unexpected nulls
+- Conducted full error and risk analysis: no division/overflow risk, no external dependencies, inherently stationary, matches DEVELOPMENT_PLAN specification exactly
+- Added DEVELOPMENT_PLAN.md progress tracking to SESSION_WORKFLOW.md (Section 4.2), updated quick reference checklist
+- Ticked off all completed Week 2 tasks in DEVELOPMENT_PLAN.md (momentum, trend, volatility, volume, stationarity)
+- Made Known Issues and Active Concerns review explicit in SESSION_WORKFLOW.md closure procedure
+- Conducted unbiased project review: identified strengths (documentation discipline, stationarity awareness, incremental delivery) and areas for improvement (missing unit tests, requirements.txt audit, DEVELOPMENT_PLAN reconciliation, visual-only verification, no shared feature interface)
+- Sixth full branch-based git workflow: created `dom/add-timeseries-features`, committed, pushed, PR created and merged
+
+**Key takeaways:**
+- Time reversal asymmetry captures the directionality of the generating process — something no other feature category measures. TRA ≈ 0 during ranging (time-reversible), large negative spikes during crises (asymmetric dynamics), consistent with theory
+- Pure pandas/numpy implementation — zero external dependency risk. Simplest feature module so far
+- TRA values are order 1e-6 which is fine — classifier uses relative differences, not absolute magnitudes. No normalisation needed
+- Lag 1 and lag 2 are correlated but not redundant — BorutaSHAP will determine if both are needed
+- Project review identified a Week 2 completion checkpoint: write tests for all feature modules, audit requirements.txt, reconcile DEVELOPMENT_PLAN with actual implementations, add numerical assertions to pipeline assembly
+- Next session: macro features (yield level, yield change, yield curve slope) — the final feature category before pipeline assembly
