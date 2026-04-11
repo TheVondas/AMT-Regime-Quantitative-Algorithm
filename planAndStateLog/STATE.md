@@ -211,3 +211,15 @@ Stage 1, Week 2 in progress — momentum, trend, volatility, and volume features
 - MFI adds volume weighting to the RSI concept — divergence between price (near highs) and MFI (declining) is an early distribution signal
 - Force Index negative mean (-0.0004) confirms "markets take the stairs up and the elevator down" — selling days are slightly more forceful than buying days
 - Same `ta` library dependency risk applies to volume features (OBV, MFI, Force Index use `ta`). Volume ratio is pure pandas
+
+### 2026-04-11 — Session 9: Discord notification workflow
+**What was done:**
+- Created `.github/workflows/notify-discord.yml` — GitHub Action that sends a Discord notification whenever STATE.md is updated on main
+- Workflow extracts the latest session log entry and sends it as a formatted embed to the project Discord channel
+- Discord webhook URL stored as GitHub repository secret (DISCORD_WEBHOOK_URL) — never exposed in code or logs
+- This session doubles as a live test of the notification workflow
+
+**Key takeaways:**
+- Webhook URLs must be treated as secrets — if leaked, anyone can post to the channel. Stored as GitHub secret, rotated after accidental exposure in chat
+- Workflow triggers only on push to main with changes to `planAndStateLog/STATE.md` — no false notifications from other file changes
+- Will now receives automatic session summaries in Discord without checking the repo manually

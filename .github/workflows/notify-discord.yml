@@ -1,0 +1,69 @@
+name: Notify Discord on STATE.md Update
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "planAndStateLog/STATE.md"
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need previous commit to extract the diff
+
+      - name: Extract latest session entry and notify Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          # Extract the latest session log entry (most recent ### heading and its content)
+          # Look for the last "### " heading in the Session Log section and grab everything after it
+          latest_entry=$(awk '
+            /^# Session Log/ { in_session=1; next }
+            in_session && /^### / {
+              # Store previous entry, start new one
+              entry=""
+              capture=1
+            }
+            capture && /^---$/ { capture=0 }
+            capture { entry=entry $0 "\n" }
+            END { printf "%s", entry }
+          ' planAndStateLog/STATE.md)
+
+          # Fallback if parsing fails
+          if [ -z "$latest_entry" ]; then
+            latest_entry="STATE.md was updated but the session entry could not be parsed. Check the file directly."
+          fi
+
+          # Truncate if too long for Discord (max 2000 chars)
+          if [ ${#latest_entry} -gt 1800 ]; then
+            latest_entry="${latest_entry:0:1800}... (truncated — see STATE.md for full entry)"
+          fi
+
+          # Build the JSON payload
+          # Escape special characters for JSON
+          json_content=$(echo "$latest_entry" | python3 -c "
+          import sys, json
+          content = sys.stdin.read().strip()
+          payload = {
+              'embeds': [{
+                  'title': '📋 STATE.md Updated',
+                  'description': content,
+                  'color': 3447003,
+                  'footer': {
+                      'text': 'AMT Regime Algorithm — Session Log'
+                  }
+              }]
+          }
+          print(json.dumps(payload))
+          ")
+
+          # Send to Discord
+          curl -s -H "Content-Type: application/json" \
+               -d "$json_content" \
+               "$DISCORD_WEBHOOK_URL"
+
+          echo "Discord notification sent."
