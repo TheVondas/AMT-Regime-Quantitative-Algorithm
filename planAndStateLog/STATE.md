@@ -304,3 +304,15 @@ Stage 1, Week 2 in progress — all 7 feature categories complete (momentum, tre
 **Key takeaways:**
 - replacing `pip freeze` constructed `requirements.txt` with a manually updated `requirements.txt` that only includes explicitly used runtime dependencies with version constraints only where necessary allows for repo to work on python version 3.9+.
 - A few quality of life improvements to the dev set up section in README.md, for example including `source venv/bin/activate` for linux/macOs terminal users.
+
+### 2026-04-12 - Session 15: Unit testing coverage for new feature modules
+**What was done:**
+- Implemented `pytest` suites for `features/timeseries.py`, `features/stationarity.py`, and `features/macro.py`.
+- Added `pyarrow` to `requirements.txt` to ensure consistent parquet file handling.
+- Verified all 36 project features now have passing unit tests.
+
+**Key takeaways:**
+- All 7 feature categories (momentum, trend, volatility, volume, stationarity, time-series, macro) are now verified and robust.
+- Adjusted the TRA test to account for the `window + lag - 1` requirement for the first non-NaN value.
+- The `adfuller` tests in the stationarity suite are computationally heavy; synthetic data is currently used for speed, but real-world SPY data may require longer runtimes.
+- Identified `RuntimeWarning: divide by zero encountered in log` during stationarity tests. This is a known artifact of using "perfect" synthetic oscillating data (zero-variance residuals in the ADF regression) and does not indicate a logic error in the implementation.
