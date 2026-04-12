@@ -4,3 +4,4 @@ yfinance
 matplotlib
 ta
 statsmodels
+pyarrow
