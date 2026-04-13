@@ -16,9 +16,9 @@ This plan assumes part-time effort (evenings/weekends). Each week has concrete d
 
 **Tasks:**
 
-- [ ] Set up Python environment (venv or conda) with core dependencies:
+- [x] Set up Python environment (venv or conda) with core dependencies:
   - `pandas`, `numpy`, `scikit-learn`, `matplotlib`, `yfinance`, `optuna`, `shap`, `statsmodels`, `ta-lib` (or `ta`), `fracdiff`, `joblib`
-- [ ] Create project directory structure:
+- [x] Create project directory structure:
   ```
   AMT-Regime-Quantitative-Algorithm/
   ├── data/
@@ -37,17 +37,17 @@ This plan assumes part-time effort (evenings/weekends). Each week has concrete d
   ├── tests/                # Unit tests
   └── configs/              # Hyperparameter configs, instrument lists
   ```
-- [ ] Write a data download script for SPY daily OHLCV (2005-present) using yfinance
-- [ ] Download VIX daily close (CBOE via yfinance: `^VIX`)
-- [ ] Download US 10Y yield and US 2Y yield from FRED (use `fredapi` or manual CSV download from https://fred.stlouisfed.org)
-- [ ] Download US 3-month T-bill rate from FRED (risk-free rate for Sharpe/Sortino calculations)
-- [ ] Write a data cleaning function: handle missing dates, forward-fill gaps of 1-2 days, align all series to the same trading day index, compute log returns
-- [ ] Save cleaned data to `data/processed/` as Parquet or CSV
-- [ ] Verify: plot SPY price, VIX, and 10Y yield on the same time axis. Visually confirm data quality and alignment
+- [x] Write a data download script for SPY daily OHLCV (2005-present) using yfinance
+- [x] Download VIX daily close (CBOE via yfinance: `^VIX`)
+- [x] Download US 10Y yield and US 5Y yield from yfinance (`^TNX`, `^FVX`) — US 2Y not available on yfinance, substituted US 5Y (see Session 3)
+- [x] Download US 3-month T-bill rate from yfinance (`^IRX`) — risk-free rate for Sharpe/Sortino calculations
+- [x] Write a data cleaning function: handle missing dates, forward-fill gaps of 1-2 days, align all series to the same trading day index, compute log returns
+- [x] Save cleaned data to `data/processed/` as Parquet
+- [x] Verify: plot SPY price, VIX, and 10Y yield on the same time axis. Visually confirm data quality and alignment
 
-**Definition of done:** You can run one script that downloads, cleans, and saves aligned daily data for SPY + VIX + yields from 2005 to present. Output is a single DataFrame with columns: `date, open, high, low, close, volume, vix, us10y, us2y, us3m, log_return`.
+**Definition of done:** You can run one script that downloads, cleans, and saves aligned daily data for SPY + VIX + yields from 2005 to present. Output is a single DataFrame with columns: `date, open, high, low, close, volume, vix, us10y, us5y, us3m, log_return`.
 
-**Knowledge required:** Basic pandas, yfinance API, FRED data access.
+**Knowledge required:** Basic pandas, yfinance API.
 
 **Tools required:** Python, pip/conda, yfinance, internet connection.
 
@@ -55,7 +55,7 @@ This plan assumes part-time effort (evenings/weekends). Each week has concrete d
 
 ### Week 2 — Pomorski-Style Feature Engineering
 
-**What you're doing:** Computing the ~20 core features from daily data that Pomorski showed are most predictive. No AMT features yet — those come in Stage 2.
+**What you're doing:** Computing the ~36 core features from daily data that Pomorski showed are most predictive, plus additional normalised variants for stationarity. No AMT features yet — those come in Stage 2.
 
 **Tasks:**
 
@@ -67,18 +67,18 @@ This plan assumes part-time effort (evenings/weekends). Each week has concrete d
 - [x] Implement trend features:
   - ADX (14-day)
   - Plus DI / Minus DI (14-day)
-  - Price vs SMA(50), price vs SMA(200)
-  - SMA(50) vs SMA(200) crossover flag
+  - Price/SMA(50) ratio, Price/SMA(200) ratio — ratios used instead of raw differences for stationarity (see Session 6)
+  - SMA(50)/SMA(200) crossover ratio — continuous ratio instead of binary flag to preserve information about crossover strength (see Session 6)
 - [x] Implement volatility features:
-  - ATR (14-day, 30-day)
+  - ATR (14-day, 30-day) — expressed as percentage of close for cross-time comparability (see Session 7)
   - Rolling standard deviation of returns (20-day, 60-day)
-  - VIX level (already in data)
-  - VIX 5-day change
+  - VIX level (passthrough from daily data)
+  - VIX 5-day change (absolute and percentage) — percentage change added to normalise for VIX level (see Session 7)
 - [x] Implement volume features:
-  - OBV (On-Balance Volume)
+  - OBV Rate of Change (21-day) — raw OBV is cumulative and non-stationary (~0 to ~17B), replaced with ROC to capture volume flow direction (see Session 8)
   - Volume ratio: current volume / 20-day average volume
   - MFI (Money Flow Index, 14-day)
-  - Force Index (13-day EMA)
+  - Normalised Force Index (13-day EMA) — raw Force Index scales with price × volume (~8x larger in 2026 vs 2005), normalised by (close × 20-day avg volume) for cross-time comparability (see Session 8)
 - [x] Implement stationarity features:
   - Rolling ADF test statistic (252-day window) — this is slow, compute once and cache
   - Rolling ADF p-value (252-day window)
@@ -96,7 +96,7 @@ This plan assumes part-time effort (evenings/weekends). Each week has concrete d
 - [ ] Save complete feature matrix to `data/features/spy_features.parquet`
 - [ ] Verify: print feature correlation matrix. Check no feature is >0.95 correlated with another (drop one if so). Check no NaNs in the output after warmup period
 
-**Definition of done:** A feature matrix with ~20-25 columns, one row per trading day, all lagged by 1 day, fractionally differenced where needed, saved to disk. Warmup period (first 252 days) excluded from output.
+**Definition of done:** A feature matrix with ~36 columns (9 momentum, 6 trend, 7 volatility, 4 volume, 2 stationarity, 3 time-series, 5 macro), one row per trading day, all lagged by 1 day, fractionally differenced where needed, saved to disk. Warmup period (first 252 days) excluded from output. Duplicate columns (VIX, us10y) deduplicated at assembly.
 
 **Knowledge required:** Technical indicator formulas (or use ta-lib), fractional differencing concept from López de Prado (2018), ADF test interpretation.
 
@@ -798,7 +798,7 @@ This plan assumes part-time effort (evenings/weekends). Each week has concrete d
 | Week | Stage | Focus | Key Deliverable |
 |------|-------|-------|-----------------|
 | 1 | Stage 1 | Environment + data | Clean daily data pipeline |
-| 2 | Stage 1 | Feature engineering | ~25 Pomorski-style features |
+| 2 | Stage 1 | Feature engineering | 36 Pomorski-style features (7 categories) |
 | 3 | Stage 1 | Regime labeller | 6-state labels, visually validated |
 | 4 | Stage 1 | Baseline classifier | 3-class RF, MCC > 0.3 |
 | 5 | Stage 1 | Full classifier + tuning | 6-class RF, hyperparameters tuned |
