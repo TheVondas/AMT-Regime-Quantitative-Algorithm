@@ -1,6 +1,6 @@
 # Current Project State
 
-**Last updated:** 2026-04-13
+**Last updated:** 2026-04-14
 
 ## Current Stage
 Stage 1, Week 2 in progress — all 7 feature categories complete (momentum, trend, volatility, volume, stationarity, time-series, macro). Pipeline assembly next (fractional differencing, 1-day lag, correlation check, save feature matrix).
@@ -316,3 +316,25 @@ Stage 1, Week 2 in progress — all 7 feature categories complete (momentum, tre
 - Adjusted the TRA test to account for the `window + lag - 1` requirement for the first non-NaN value.
 - The `adfuller` tests in the stationarity suite are computationally heavy; synthetic data is currently used for speed, but real-world SPY data may require longer runtimes.
 - Identified `RuntimeWarning: divide by zero encountered in log` during stationarity tests. This is a known artifact of using "perfect" synthetic oscillating data (zero-variance residuals in the ADF regression) and does not indicate a logic error in the implementation.
+
+### 2026-04-13 — Session 16: DEVELOPMENT_PLAN reconciliation
+**What was done:**
+- Reviewed the full DEVELOPMENT_PLAN.md against actual implementations across Sessions 1-15
+- Ticked off all completed Week 1 tasks (previously unchecked despite being done in Sessions 2-3)
+- Corrected Week 1 data source descriptions: US 2Y yield → US 5Y (yfinance `^FVX`), all yields sourced from yfinance not FRED, definition of done column `us2y` → `us5y`
+- Updated Week 2 task descriptions to match deliberate deviations:
+  - SMA crossover flag → continuous SMA crossover ratio (preserves crossover strength)
+  - Raw OBV → OBV Rate of Change (21-day, stationary)
+  - Raw Force Index → Normalised Force Index (dimensionless, cross-time comparable)
+  - ATR noted as percentage of close
+  - VIX percentage change added alongside absolute change
+  - Price vs SMA → Price/SMA ratio (stationary)
+- Updated feature count from ~20-25 to 36 across 7 categories, with deduplication note
+- Updated timeline summary table
+- Pulled Will's Sessions 14-15: requirements.txt cleanup, README improvements, unit tests for stationarity/timeseries/macro modules
+
+**Key takeaways:**
+- DEVELOPMENT_PLAN now accurately reflects what was built — someone reading it gets the correct picture of every deliberate deviation and the reasoning behind it
+- Will's Sessions 14-15 addressed two of the five items from the project review (unit tests and requirements.txt audit) — good unprompted collaboration
+- All Week 2 completion checkpoint items now resolved: tests written (Will), requirements audited (Will), DEVELOPMENT_PLAN reconciled (this session). Only pipeline assembly remains
+- Next session: pipeline assembly — fractional differencing, 1-day lag, correlation check, deduplication, save feature matrix to `data/features/spy_features.parquet`
