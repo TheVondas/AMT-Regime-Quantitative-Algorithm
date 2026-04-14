@@ -3,7 +3,7 @@
 **Last updated:** 2026-04-14
 
 ## Current Stage
-Stage 1, Week 2 in progress — all 7 feature categories complete (momentum, trend, volatility, volume, stationarity, time-series, macro). Pipeline assembly next (fractional differencing, 1-day lag, correlation check, save feature matrix).
+Stage 1, Week 2 complete. 36 features across 7 categories, fractionally differenced, lagged, and saved to data/features/spy_features.parquet. Week 3 (rule-based regime labeller) is next.
 
 ## What's Next
 - [x] Write `src/data/download.py` — download SPY, VIX, yields from yfinance ✓
@@ -17,7 +17,7 @@ Stage 1, Week 2 in progress — all 7 feature categories complete (momentum, tre
 - [x] Week 2 — Stationarity features: rolling ADF ✓
 - [x] Week 2 — Time-series features: time reversal asymmetry ✓
 - [x] Week 2 — Macro features: yield level, yield change, yield curve slope ✓
-- [ ] Week 2 — Fractional differencing, 1-day lag, correlation check, save feature matrix
+- [x] Week 2 — Fractional differencing, 1-day lag, correlation check, save feature matrix ✓
 
 ## Active Concerns
 - Intraday data source for Stage 2 AMT features: Polygon.io vs Alpaca vs Databento. Decision needed by Week 7
@@ -338,3 +338,25 @@ Stage 1, Week 2 in progress — all 7 feature categories complete (momentum, tre
 - Will's Sessions 14-15 addressed two of the five items from the project review (unit tests and requirements.txt audit) — good unprompted collaboration
 - All Week 2 completion checkpoint items now resolved: tests written (Will), requirements audited (Will), DEVELOPMENT_PLAN reconciled (this session). Only pipeline assembly remains
 - Next session: pipeline assembly — fractional differencing, 1-day lag, correlation check, deduplication, save feature matrix to `data/features/spy_features.parquet`
+
+### 2026-04-14 — Session 17: Feature pipeline assembly — Week 2 complete
+**What was done:**
+- Created `src/features/fracdiff.py` — pure numpy implementation of López de Prado's (2018) fixed-width window fractional differencing, replacing the `fracdiff` package which is incompatible with Python 3.14
+- Created `src/features/assemble.py` — pipeline assembly script that combines all 7 feature categories, tests stationarity, applies fractional differencing, lags by 1 day, checks correlations, and saves the final feature matrix
+- Ran ADF tests on all 36 features: 33 already stationary, 3 required fractional differencing:
+  - `us10y`: d=0.25 (75% memory retained)
+  - `yield_curve_10y3m`: d=0.3 (70% memory retained)
+  - `yield_curve_10y5y`: d=0.35 (65% memory retained)
+- Saved optimal d values to `configs/fracdiff_d_values.json` for reproducibility
+- Saved final feature matrix to `data/features/spy_features.parquet`: 36 features, 5,088 rows, zero NaNs, date range 2006-01-09 to 2026-03-31
+- Identified 3 highly correlated feature pairs (>0.95): macd/macd_signal, atr_14_pct/atr_30_pct, atr_14_pct/rolling_std_20 — flagged for BorutaSHAP in Week 5, not dropped
+- Conducted full error and risk analysis per SESSION_WORKFLOW.md
+
+**Key takeaways:**
+- Week 2 is now fully complete — all feature engineering, pipeline assembly, and verification done
+- 33 of 36 features were already stationary thanks to the normalisation discipline maintained across all feature sessions (ratios, ROC, percentages). Only the 3 macro level/slope features needed fractional differencing
+- Low d values (0.25-0.35) mean the classifier retains most of the yield level/slope memory while removing non-stationary drift — best of both worlds
+- VIX passed ADF (p=0.000001) despite being a level feature — it's sufficiently mean-reverting over the full 20-year sample. No differencing needed
+- The `fracdiff` package Python 3.14 incompatibility was a non-issue — the López de Prado fixed-width window method is straightforward to implement in pure numpy and eliminates the external dependency entirely
+- 3 correlated pairs are expected (MACD/signal, two ATR windows, ATR/rolling std) — all measure overlapping concepts. BorutaSHAP will handle this at Week 5
+- Next: Week 3 — rule-based regime labeller (KAMA/EMA trend + ATR volatility + prior state context → 6 regime labels)

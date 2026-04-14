@@ -88,13 +88,13 @@ This plan assumes part-time effort (evenings/weekends). Each week has concrete d
 - [x] Implement macro features:
   - 10Y yield level, 10Y yield 20-day change (+ percentage change)
   - Yield curve slope: 10Y-3M and 10Y-5Y (substituted for 10Y-2Y — see Session 3/13)
-- [ ] Apply fractional differencing to non-stationary features:
-  - Use `fracdiff` package or implement López de Prado's fixed-width window method
+- [x] Apply fractional differencing to non-stationary features:
+  - Implemented López de Prado's fixed-width window method in pure numpy (`fracdiff` package incompatible with Python 3.14)
   - For each feature: find minimum d such that the series passes ADF test at 5% significance
-  - Store optimal d values in a config file for reproducibility
-- [ ] Lag all features by 1 day (feature at time t uses data up to t-1 only)
-- [ ] Save complete feature matrix to `data/features/spy_features.parquet`
-- [ ] Verify: print feature correlation matrix. Check no feature is >0.95 correlated with another (drop one if so). Check no NaNs in the output after warmup period
+  - Optimal d values stored in `configs/fracdiff_d_values.json`: us10y=0.25, yield_curve_10y3m=0.3, yield_curve_10y5y=0.35
+- [x] Lag all features by 1 day (feature at time t uses data up to t-1 only)
+- [x] Save complete feature matrix to `data/features/spy_features.parquet`
+- [x] Verify: correlation check found 3 pairs >0.95 (macd/signal, atr_14/atr_30, atr_14/rolling_std_20) — flagged for BorutaSHAP, not dropped. Zero NaNs after warmup
 
 **Definition of done:** A feature matrix with ~36 columns (9 momentum, 6 trend, 7 volatility, 4 volume, 2 stationarity, 3 time-series, 5 macro), one row per trading day, all lagged by 1 day, fractionally differenced where needed, saved to disk. Warmup period (first 252 days) excluded from output. Duplicate columns (VIX, us10y) deduplicated at assembly.
 
