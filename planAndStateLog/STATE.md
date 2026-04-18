@@ -360,3 +360,12 @@ Stage 1, Week 2 complete. 36 features across 7 categories, fractionally differen
 - The `fracdiff` package Python 3.14 incompatibility was a non-issue — the López de Prado fixed-width window method is straightforward to implement in pure numpy and eliminates the external dependency entirely
 - 3 correlated pairs are expected (MACD/signal, two ATR windows, ATR/rolling std) — all measure overlapping concepts. BorutaSHAP will handle this at Week 5
 - Next: Week 3 — rule-based regime labeller (KAMA/EMA trend + ATR volatility + prior state context → 6 regime labels)
+
+### 2026-04-18 - Session 18: Testing the Feature Assembly pipeline
+**What was done:**
+- Implemented `pytest` suite for `fracdiff.py`, verifying recursive weight calculation and stationarity search.
+- Implemented `pytest` suite for `assemble.py` to verify the full pipeline: concatenation, column deduplication (VIX/yields), and 1-day lagging.
+
+**Key takeaways:**
+- Verified that the 1-day lag is correctly applied to prevent look-ahead bias; feature at time $t$ only contains information from $t-1$.
+- Fractional differencing correctly identifies $d$ for non-stationary series while maintaining fixed-width window memory.
