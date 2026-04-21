@@ -157,15 +157,15 @@ This plan assumes part-time effort (evenings/weekends). Each week has concrete d
 
 **Tasks:**
 
-- [ ] Collapse 6 regime labels into 3 for the baseline:
+- [x] Collapse 6 regime labels into 3 for the baseline (`src/classifier/labels.py`):
   - Trending Up → **Up**
   - Trending Down → **Down**
   - All ranging + transition states → **Sideways**
-- [ ] Set up walk-forward validation:
-  - Training window: expanding, starting from 2006
-  - Validation window: 1 year, rolling forward
-  - Test holdout: 2022-2024 (never touched until final evaluation)
-  - Implement PGTS: purge 5 days between train and validation to prevent leakage
+- [x] Set up walk-forward validation (`src/classifier/splits.py`):
+  - Training window: expanding, starting from 2006-01-09
+  - Validation window: 1 calendar year, rolling forward (12 folds, 2010-2021)
+  - Test holdout: 2022-2024 blocked by the splitter (never touched until final evaluation)
+  - PGTS: 5-day purge between train and validation. Unit tests enforce gap and holdout discipline
 - [ ] Train a Random Forest classifier:
   - Initial hyperparameters from Pomorski: `n_estimators=250, max_depth=10, min_samples_leaf=80, max_features=0.3`
   - `class_weight="balanced"` to handle class imbalance

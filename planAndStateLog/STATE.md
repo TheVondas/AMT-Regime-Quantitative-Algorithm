@@ -1,23 +1,20 @@
 # Current Project State
 
-**Last updated:** 2026-04-17
+**Last updated:** 2026-04-21
 
 ## Current Stage
-Stage 1, Week 3 complete. Rule-based regime labeller (v1) implemented with 6 regimes. All regimes have ≥ 50 samples. Labels saved to data/processed/spy_regime_labels.parquet (5,343 days). Week 4 (baseline 3-class RF classifier) is next.
+Stage 1, Week 4 in progress. Baseline classifier infrastructure now in place: 6→3 label collapse utility, walk-forward splitter with 5-day PGTS purge (12 yearly folds, 2010-2021), holdout 2022-2024 blocked. Next: train Random Forest with Pomorski hyperparameters, evaluate MCC + confusion matrix, simple backtest, SHAP analysis, save model.
 
 ## What's Next
-- [x] Write `src/data/download.py` — download SPY, VIX, yields from yfinance ✓
-- [x] Write `src/data/clean.py` — align dates, forward-fill, compute log returns ✓
-- [x] Save to `data/raw/` and `data/processed/` ✓
-- [x] Verification plot: SPY price, VIX, 10Y yield on same time axis ✓
-- [x] Week 2 — Momentum features: ROC (4 lookbacks), RSI, CMO, MACD ✓
-- [x] Week 2 — Trend features: ADX, +DI/-DI, Price/SMA, SMA crossover ✓
-- [x] Week 2 — Volatility features: ATR, rolling std, VIX, VIX change ✓
-- [x] Week 2 — Volume features: OBV ROC, volume ratio, MFI, normalised Force Index ✓
-- [x] Week 2 — Stationarity features: rolling ADF ✓
-- [x] Week 2 — Time-series features: time reversal asymmetry ✓
-- [x] Week 2 — Macro features: yield level, yield change, yield curve slope ✓
-- [x] Week 2 — Fractional differencing, 1-day lag, correlation check, save feature matrix ✓
+- [x] Week 4 — Label collapse utility (6 regimes → 3: Up/Down/Sideways) ✓
+- [x] Week 4 — Walk-forward splitter with 5-day PGTS purge, holdout blocked ✓
+- [x] Week 4 — Splitter sanity plot (fold boundaries overlaid on SPY) ✓
+- [x] Week 4 — Unit tests for labels + splits ✓
+- [ ] Week 4 — Train RF (Pomorski: n_estimators=250, max_depth=10, min_samples_leaf=80, max_features=0.3, class_weight="balanced")
+- [ ] Week 4 — Evaluate: MCC per class + overall, confusion matrix. Target MCC > 0.3 per class
+- [ ] Week 4 — Simple backtest: long when Up predicted, short/flat when Down, flat when Sideways. Compare vs buy-and-hold (0.2% round-trip costs)
+- [ ] Week 4 — SHAP analysis: top 15 feature importances
+- [ ] Week 4 — Save trained model via joblib
 
 ## Active Concerns
 - Intraday data source for Stage 2 AMT features: Polygon.io vs Alpaca vs Databento. Decision needed by Week 7
@@ -411,3 +408,30 @@ Stage 1, Week 3 complete. Rule-based regime labeller (v1) implemented with 6 reg
 - `apply_min_duration()` mutates while iterating — can create cascading short regimes at boundaries. Acceptable for v1; iterative-until-stable approach would fix edge cases
 - Accumulation at 98 samples is thin but above threshold — may need merging with Ranging Neutral for per-regime strategy training if insufficient
 - Next: Week 4 — baseline 3-class Random Forest classifier
+
+### 2026-04-21 — Session 20: Week 4 kickoff — label collapse + walk-forward splitter
+**What was done:**
+- Resolved session-number collision and branch merge: rebased `dom/add-regime-labeller` (Week 3 labeller) onto updated main which had Will's unit-test work and his own Session 18 entry. Renumbered Dom's labeller session to Session 19 (merge order), preserved Will's Session 18 on main. Merged via PR #20.
+- Created new `src/classifier/` module with `__init__.py`
+- Created `src/classifier/labels.py` — `collapse_to_3class()` maps 6-regime int ids to 3-class baseline: Trending Up → Up (0), Trending Down → Down (1), all ranging + transition states → Sideways (2). Raises on unknown ids rather than silent NaN
+- Created `src/classifier/splits.py` — `walk_forward_splits()` yields `Fold(train_idx, val_idx, ...)` records. Expanding training from 2006-01-09, 4-year initial window, 1-year rolling validation, 5-day PGTS purge, holdout 2022-2024 blocked
+- Created `src/classifier/verify_splits.py` — saves fold-overlay plot to `notebooks/walkforward_splits.png` (86KB)
+- Created `tests/classifier/test_labels.py` (4 tests) + `tests/classifier/test_splits.py` (8 tests) — all passing. Full suite 38 passed
+- Ran splitter against real feature matrix: 12 folds, 5-day purge verified on every fold, no holdout leakage, expanding training confirmed
+
+**Fold summary (against spy_features.parquet):**
+- Fold 1: train 2006-01-09 → 2009-12-31 (1003d), val 2010-01-11 → 2011-01-07 (252d)
+- Fold 12: train 2006-01-09 → 2020-12-31 (3772d), val 2021-01-11 → 2021-12-31 (247d)
+- Total: 12 yearly validation windows, all strictly before 2022-01-01
+
+**Key design decisions (deviations documented):**
+- `initial_train_years=4` chosen as default (DEVELOPMENT_PLAN didn't specify). 2006-2009 initial training covers GFC — enough structure before first validation year
+- `purge_days=5` expressed in trading days (indices) not calendar days, matching how the feature matrix is indexed. Sufficient given fracdiff windows are bounded and only look-ahead coupling is the 1-day lag
+- `Fold` dataclass rather than plain tuples — carries train/val date boundaries for plotting and logging without recomputation
+- Collapse mapping keeps `int64` dtype (not categorical) to stay compatible with sklearn `class_weight="balanced"` and MCC calculations without conversion
+
+**Key takeaways:**
+- Force-with-lease rebase is the right resolution for concurrent session-number collisions — preserves main immutability, puts the branch commit cleanly on top, one STATE.md conflict to resolve
+- 4-year initial training gives Fold 1 enough structural variety (pre-GFC, GFC, recovery) to avoid the first validation year being a pure out-of-sample shock. If MCC is materially lower on Fold 1 than Folds 2-12, revisit
+- Training the RF is deliberately deferred to Session 21 — getting the splitter trusted in isolation is worth a session on its own, since it's the single biggest leakage risk in the entire project
+- Next: Session 21 — train RF with Pomorski hyperparameters, evaluate MCC + confusion matrix across all 12 folds, simple backtest, SHAP, save model
