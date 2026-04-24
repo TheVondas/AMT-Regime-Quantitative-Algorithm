@@ -435,3 +435,15 @@ Stage 1, Week 4 in progress. Baseline classifier infrastructure now in place: 6�
 - 4-year initial training gives Fold 1 enough structural variety (pre-GFC, GFC, recovery) to avoid the first validation year being a pure out-of-sample shock. If MCC is materially lower on Fold 1 than Folds 2-12, revisit
 - Training the RF is deliberately deferred to Session 21 — getting the splitter trusted in isolation is worth a session on its own, since it's the single biggest leakage risk in the entire project
 - Next: Session 21 — train RF with Pomorski hyperparameters, evaluate MCC + confusion matrix across all 12 folds, simple backtest, SHAP, save model
+
+### 2026-04-24 - Session 21: Expanded Coverage & Test Integrity
+**What was done:**
+- Refactored `test_labels.py` to use a `mock_regime_labels` fixture, removing local parquet file dependencies that cause `FileNotFoundError` for machines without the regime labels data and also improving speed and hermeticity tests.
+- Enhanced `test_splits.py` with validation for purge-gap enforcement and error handling for insufficient data ranges.
+- Implemented `tests/labeller/test_labeller.py` providing initial coverage for KAMA calculation, trend/volatility detection, and regime smoothing. Due to the amount of logic in `labeller.py`, tests may need to be improved upon in the future for true test robustness.
+- Removed redundant `__init__.py` file in the classifier test directory to keep the structure clean and standardised with the rest of the test libraries.
+
+**Key takeaways:**
+- Prioritising realism in mock fixtures improves the "integrity" of the tests and provides better visual validation for the regime mapping logic.
+- The labeller engine now has a baseline "Safety Net," though coverage should be expanded as the regime-shifting rules become more complex.
+- Walk-forward splits now have automated verification that the 5-day purge gap is consistently applied, preventing information leakage.
