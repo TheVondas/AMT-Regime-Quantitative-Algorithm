@@ -67,3 +67,18 @@ def test_default_produces_12_yearly_folds():
     idx = _daily_index("2006-01-02", "2024-12-31")
     folds = walk_forward_splits(idx)
     assert len(folds) == 12
+
+
+def test_insufficient_data_raises_error():
+    """Verify that very short indices raise a helpful error."""
+    idx = pd.to_datetime(["2020-01-01", "2020-01-02"])
+    with pytest.raises(ValueError, match="No data found"):
+        walk_forward_splits(idx, train_start=pd.Timestamp("2021-01-01"))
+
+
+def test_purge_removes_correct_number_of_days():
+    """Explicitly verify the 5-day gap exists between train end and val start."""
+    idx = pd.bdate_range("2010-01-01", "2020-01-01")
+    folds = walk_forward_splits(idx, purge_days=5)
+    fold = folds[0]
+    assert fold.val_idx[0] - fold.train_idx[-1] == 6
