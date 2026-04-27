@@ -20,51 +20,86 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-# ── Paths ────────────────────────────────────────────────────────────────────
+# ── Constants & Paths ────────────────────────────────────────────────────────
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RAW_DIR = PROJECT_ROOT / "data" / "raw"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 
+MAX_FILL_DAYS = 2
 
 # ── Cleaning logic ───────────────────────────────────────────────────────────
 
 
-def load_raw(filename: str) -> pd.DataFrame:
-    """Load a raw Parquet file and lowercase column names."""
-    df = pd.read_parquet(RAW_DIR / filename)
+def load_raw(filename: str, raw_dir: Path | str = RAW_DIR) -> pd.DataFrame:
+    """Load a raw Parquet file and lowercase column names.
+
+    Args:
+        filename (str): Name of the parquet file (e.g., 'spy.parquet').
+        raw_dir (Path | str): Directory containing raw data files.
+
+    Returns:
+        pd.DataFrame: DataFrame with lowercase column names.
+    """
+    assert filename.endswith(
+        ".parquet"
+    ), f"filename ({filename}) must have a .parquet suffix"
+    file_path = Path(raw_dir) / filename
+    assert (file_path).exists(), f"could not find parquet file at path: {file_path}"
+    df = pd.read_parquet(file_path)
     df.columns = [c.lower() for c in df.columns]
     return df
 
 
-def build_daily() -> pd.DataFrame:
-    """Build the aligned daily DataFrame."""
+def build_daily(
+    raw_dir: Path | str = RAW_DIR, max_fill: int = MAX_FILL_DAYS, logging: bool = True
+) -> pd.DataFrame:
+    """Build the aligned daily DataFrame.
+
+    Args:
+        raw_dir (Path | str): Directory containing raw data files.
+        max_fill (int): Maximum consecutive days to forward-fill gaps.
+        logging (bool): If True, prints status updates to the terminal.
+
+    Returns:
+        pd.DataFrame: Aligned and cleaned daily DataFrame.
+    """
+    assert max_fill >= 0, "max_fill must be a non-negative integer"
 
     # SPY is the master — its OHLCV forms the base
     spy = load_raw("spy.parquet")
 
     # Load supplementary series (close only)
-    vix = load_raw("vix.parquet")[["close"]].rename(columns={"close": "vix"})
-    us10y = load_raw("us10y.parquet")[["close"]].rename(columns={"close": "us10y"})
-    us5y = load_raw("us5y.parquet")[["close"]].rename(columns={"close": "us5y"})
-    us3m = load_raw("us3m.parquet")[["close"]].rename(columns={"close": "us3m"})
+    vix = load_raw(filename="vix.parquet", raw_dir=raw_dir)[["close"]].rename(
+        columns={"close": "vix"}
+    )
+    us10y = load_raw(filename="us10y.parquet", raw_dir=raw_dir)[["close"]].rename(
+        columns={"close": "us10y"}
+    )
+    us5y = load_raw(filename="us5y.parquet", raw_dir=raw_dir)[["close"]].rename(
+        columns={"close": "us5y"}
+    )
+    us3m = load_raw(filename="us3m.parquet", raw_dir=raw_dir)[["close"]].rename(
+        columns={"close": "us3m"}
+    )
 
     # Join everything onto SPY's index
     df = spy.join([vix, us10y, us5y, us3m], how="left")
 
-    # Forward-fill gaps up to 2 days (Treasury holidays)
+    # Forward-fill gaps up to the specified limit (default is 2 for Treasury holidays)
     fill_cols = ["vix", "us10y", "us5y", "us3m"]
-    df[fill_cols] = df[fill_cols].ffill(limit=2)
+    if max_fill != 0:
+        df[fill_cols] = df[fill_cols].ffill(limit=max_fill)
 
     # Compute log return: ln(close_t / close_{t-1})
     df["log_return"] = np.log(df["close"] / df["close"].shift(1))
 
     # Drop rows with any remaining NaN (first row due to log_return,
-    # plus any start-of-series gaps beyond the 2-day fill limit)
+    # plus any start-of-series gaps beyond the specified fill limit)
     before = len(df)
     df = df.dropna()
     dropped = before - len(df)
-    if dropped > 0:
+    if dropped > 0 and logging:
         print(f"  Dropped {dropped} rows with NaN (start-of-series edge)")
 
     return df
