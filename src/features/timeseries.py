@@ -27,6 +27,8 @@ Three lags capture this at different time scales:
 All features are computed from the daily DataFrame in data/processed/daily.parquet.
 """
 
+from typing import List
+
 import pandas as pd
 
 
@@ -46,15 +48,17 @@ def compute_time_reversal_asymmetry(
     produce non-zero TRA.
 
     Args:
-        log_returns: Daily log returns series.
-        lag: Number of days to lag (1, 2, or 3 for our use case).
-        window: Rolling window size in trading days. Default 252 (~1 year),
+        log_returns (pd.Series): Daily log returns series.
+        lag (int): Number of days to lag for the asymmetry check.
+        window (int): Rolling window size in trading days. Default 252 (~1 year),
             consistent with the stationarity features.
 
     Returns:
-        Rolling TRA statistic as a Series. Values near zero indicate
+        pd.Series: Rolling TRA statistic. Values near zero indicate
         time-reversibility; deviations indicate asymmetric dynamics.
     """
+    assert lag > 0, f"lag ({lag}) must be a positive integer."
+    assert window > 0, f"window ({window}) must be a positive integer."
     x_t = log_returns
     x_lagged = log_returns.shift(lag)
 
@@ -64,28 +68,40 @@ def compute_time_reversal_asymmetry(
     return pointwise.rolling(window=window).mean()
 
 
-def build_timeseries_features(df: pd.DataFrame) -> pd.DataFrame:
+def build_timeseries_features(
+    df: pd.DataFrame,
+    lags: List[int] | int = [1, 2, 3],
+    tra_window: int = 252,
+) -> pd.DataFrame:
     """Build all time-series features from the daily DataFrame.
 
     Args:
         df: Daily DataFrame with a 'log_return' column.
+        lags (List[int] | int): List of lags to compute TRA for (default [1, 2, 3]).
+        tra_window (int): Rolling window size for the TRA calculation.
 
     Returns:
-        DataFrame with time-series feature columns, same index as input.
-        Columns: tra_lag1_252, tra_lag2_252, tra_lag3_252.
+        pd.DataFrame: Complexity features with dynamic column names:
+            - tra_lag{lag}_{tra_window} for lag in lags.
     """
-    log_returns = df["log_return"]
+    assert tra_window > 0, f"tra_window ({tra_window}) must be a positive integer."
+    log_returns = df["log_return"].copy()
 
     features = pd.DataFrame(index=df.index)
 
-    features["tra_lag1_252"] = compute_time_reversal_asymmetry(
-        log_returns, lag=1, window=252
-    )
-    features["tra_lag2_252"] = compute_time_reversal_asymmetry(
-        log_returns, lag=2, window=252
-    )
-    features["tra_lag3_252"] = compute_time_reversal_asymmetry(
-        log_returns, lag=3, window=252
-    )
+    if isinstance(lags, int):
+        assert lags > 0, f"lags ({lags}) must be a positive integer."
+        lags = [lags]
+    visit = set()
+    for i, lag in enumerate(lags):
+        if lag in visit:
+            continue
+        assert (
+            lag > 0
+        ), f"lags[i] must be a positive integers for all i (lags[{i}] = {lag})."
+        features[f"tra_lag{lag}_{tra_window}"] = compute_time_reversal_asymmetry(
+            log_returns, lag=lag, window=tra_window
+        )
+        visit.add(lag)
 
     return features

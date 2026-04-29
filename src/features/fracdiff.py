@@ -29,17 +29,21 @@ def _get_weights(d: float, window: int) -> np.ndarray:
         w_k = -w_{k-1} * (d - k + 1) / k
 
     Args:
-        d: Fractional differencing order (0 < d < 1).
-        window: Number of weights to compute (fixed window width).
+        d (float): Fractional differencing order (0 < d < 1).
+        window (int): Number of weights to compute (fixed window width).
 
     Returns:
-        Array of weights, shape (window, 1).
+        np.ndarray: Numpy array of weights, shape (window, 1).
     """
-    weights = [1.0]
+    assert 0 < d < 1, f"Fractional differencing order ({d}) must be in range: (0, 1)."
+    assert 0 < window, f"window ({window}) must be a positive integer."
+    weights = np.zeros(window)
+    weights[-1] = 1.0  # w_0
+
+    # bottom up computation to avoid need for array reversal
     for k in range(1, window):
-        w = -weights[-1] * (d - k + 1) / k
-        weights.append(w)
-    return np.array(weights[::-1]).reshape(-1, 1)
+        weights[window - 1 - k] = weights[window - k] * (k - 1 - d) / k
+    return weights.reshape(-1, 1)
 
 
 def frac_diff(series: pd.Series, d: float, window: int = 100) -> pd.Series:
@@ -50,22 +54,29 @@ def frac_diff(series: pd.Series, d: float, window: int = 100) -> pd.Series:
     history.
 
     Args:
-        series: Input time series.
-        d: Fractional differencing order (0 < d ≤ 1). d=0 returns the
+        series (pd.Series): Input time series.
+        d (float): Fractional differencing order (0 < d ≤ 1). d=0 returns the
             original series, d=1 is equivalent to first differencing.
-        window: Fixed window width for weight computation. Larger windows
+        window (int): Fixed window width for weight computation. Larger windows
             retain more memory but are slower. Default 100 is sufficient
             for daily financial data.
 
     Returns:
-        Fractionally differenced series with same index as input.
+        pd.Series: Fractionally differenced series with same index as input.
     """
-    weights = _get_weights(d, window)
+    if d == 0:
+        return series
+    assert 0 < d <= 1, f"d ({d}) must be in range (0, 1]."
+    assert window > 0, f"Window ({window}) must be a positive integer."
+    weights = _get_weights(d, window) if d < 1 else np.array([[-1.0], [1.0]])
+    if d == 1:
+        window = 2  # standard first difference
     result = pd.Series(index=series.index, dtype=float)
 
+    weights_t = weights.T
     for i in range(window - 1, len(series)):
         segment = series.iloc[i - window + 1 : i + 1].values.reshape(-1, 1)
-        result.iloc[i] = np.dot(weights.T, segment).item()
+        result.iloc[i] = np.dot(weights_t, segment).item()
 
     return result
 
@@ -86,23 +97,29 @@ def find_min_d(
     needed).
 
     Args:
-        series: Input time series.
-        max_d: Maximum d to test (default 1.0).
-        significance: ADF p-value threshold (default 0.05).
-        window: Fixed window width for fractional differencing.
-        d_step: Step size for d search (default 0.05).
+        series (pd.Series): Input time series.
+        max_d (float): Maximum d to test (default 1.0).
+        significance (float): ADF p-value threshold (default 0.05).
+        window (int): Fixed window width for fractional differencing.
+        d_step (float): Step size for d search (default 0.05).
 
     Returns:
-        Minimum d value that achieves stationarity. Returns max_d if
+        float: Minimum d value that achieves stationarity. Returns max_d if
         stationarity is not achieved.
     """
+    assert max_d > 0.0, f"max_d ({max_d}) must be positive."
+    assert (
+        0 < significance < 1
+    ), f"significance ({significance}) must be in range: (0, 1)."
+    assert d_step > 0.0, f"d_step ({d_step}) must be positive."
+
     # First check if series is already stationary
     clean = series.dropna()
     if len(clean) < 50:
         return 0.0
 
-    result = adfuller(clean.values, regression="c", autolag="AIC")
-    if result[1] < significance:
+    _, pvalue, *_ = adfuller(clean.values, regression="c", autolag="AIC")
+    if pvalue < significance:
         return 0.0
 
     # Search for minimum d
@@ -113,8 +130,8 @@ def find_min_d(
             d += d_step
             continue
 
-        result = adfuller(diffed.values, regression="c", autolag="AIC")
-        if result[1] < significance:
+        _, pvalue, *_ = adfuller(diffed.values, regression="c", autolag="AIC")
+        if pvalue < significance:
             return round(d, 2)
 
         d += d_step

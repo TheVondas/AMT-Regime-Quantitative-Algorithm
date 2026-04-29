@@ -37,12 +37,13 @@ def compute_yield_change(yield_series: pd.Series, period: int = 20) -> pd.Series
     is a very different macro signal than a stable yield at the same level.
 
     Args:
-        yield_series: Daily yield closing values (e.g., us10y).
-        period: Lookback period in trading days.
+        yield_series (pd.Series): Daily yield closing values (e.g., us10y).
+        period (int): Lookback period in trading days (default 20).
 
     Returns:
-        Absolute change in yield over the period (in percentage points).
+        pd.Series: Absolute change in yield over the period (in percentage points).
     """
+    assert period > 0, f"period ({period}) must be a positive integer."
     return yield_series.diff(period)
 
 
@@ -55,13 +56,14 @@ def compute_yield_pct_change(yield_series: pd.Series, period: int = 20) -> pd.Se
     of the move, not just the absolute basis points.
 
     Args:
-        yield_series: Daily yield closing values (e.g., us10y).
-        period: Lookback period in trading days.
+        yield_series (pd.Series): Daily yield closing values (e.g., us10y).
+        period (int): Lookback period in trading days (default 20).
 
     Returns:
-        Percentage change in yield over the period (decimal, not multiplied
+        pd.Series: Percentage change in yield over the period (decimal, not multiplied
         by 100).
     """
+    assert period > 0, f"period ({period}) must be a positive integer."
     return yield_series.pct_change(period)
 
 
@@ -76,25 +78,31 @@ def compute_yield_curve_slope(
     expectations).
 
     Args:
-        long_yield: Long-term yield series (e.g., 10Y).
-        short_yield: Short-term yield series (e.g., 3M or 5Y).
+        long_yield (pd.Series): Long-term yield series (e.g., 10Y).
+        short_yield (pd.Series): Short-term yield series (e.g., 3M or 5Y).
 
     Returns:
-        Yield curve slope in percentage points (long - short).
+        pd.Series: Yield curve slope in percentage points (long - short).
     """
     return long_yield - short_yield
 
 
-def build_macro_features(df: pd.DataFrame) -> pd.DataFrame:
+def build_macro_features(
+    df: pd.DataFrame, us10y_change_period: int = 20
+) -> pd.DataFrame:
     """Build all macro features from the daily DataFrame.
 
     Args:
-        df: Daily DataFrame with 'us10y', 'us5y', and 'us3m' columns.
+        df (pd.DataFrame): Daily DataFrame with 'us10y', 'us5y', and 'us3m' columns.
+        us10y_change_period (int): Lookback for 10Y change features (default 20).
 
     Returns:
-        DataFrame with macro feature columns, same index as input.
-        Columns: us10y, us10y_change_20d, us10y_pct_change_20d,
-                 yield_curve_10y3m, yield_curve_10y5y.
+        pd.DataFrame: Macro features with dynamic column names:
+            - us10y
+            - us10y_change_{us10y_change_period}d
+            - us10y_pct_change_{us10y_change_period}d
+            - yield_curve_10y3m
+            - yield_curve_10y5y
     """
     us10y = df["us10y"]
     us5y = df["us5y"]
@@ -106,8 +114,12 @@ def build_macro_features(df: pd.DataFrame) -> pd.DataFrame:
     features["us10y"] = us10y
 
     # 10Y yield 20-day change (absolute and percentage)
-    features["us10y_change_20d"] = compute_yield_change(us10y, period=20)
-    features["us10y_pct_change_20d"] = compute_yield_pct_change(us10y, period=20)
+    features[f"us10y_change_{us10y_change_period}d"] = compute_yield_change(
+        yield_series=us10y, period=us10y_change_period
+    )
+    features[f"us10y_pct_change_{us10y_change_period}d"] = compute_yield_pct_change(
+        yield_series=us10y, period=us10y_change_period
+    )
 
     # Yield curve slopes
     features["yield_curve_10y3m"] = compute_yield_curve_slope(us10y, us3m)

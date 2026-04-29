@@ -18,6 +18,7 @@ All features at time t use data up to t-1 only after lagging.
 
 import json
 from pathlib import Path
+from typing import Dict, List, Tuple
 
 import pandas as pd
 from statsmodels.tsa.stattools import adfuller
@@ -42,14 +43,15 @@ CORRELATION_THRESHOLD = 0.95
 FRACDIFF_WINDOW = 100
 
 
-def build_all_features(df: pd.DataFrame) -> pd.DataFrame:
+def build_all_features(df: pd.DataFrame, logging: bool = True) -> pd.DataFrame:
     """Compute and concatenate all feature categories, deduplicating overlaps.
 
     Args:
-        df: Daily DataFrame from data/processed/daily.parquet.
+        df (pd.DataFrame): Daily DataFrame from data/processed/daily.parquet.
+        logging (bool): toggle to enable terminal output.
 
     Returns:
-        Combined feature DataFrame with unique columns.
+        pd.DataFrame: Combined feature DataFrame with unique columns.
     """
     momentum = build_momentum_features(df)
     trend = build_trend_features(df)
@@ -69,21 +71,28 @@ def build_all_features(df: pd.DataFrame) -> pd.DataFrame:
     # Both are passthroughs from daily.parquet. Keep one copy of each.
     duplicate_cols = features.columns[features.columns.duplicated()]
     if len(duplicate_cols) > 0:
-        print(f"  Removing duplicate columns: {list(duplicate_cols)}")
+        if logging:
+            print(f"  Removing duplicate columns: {list(duplicate_cols)}")
         features = features.loc[:, ~features.columns.duplicated()]
 
     return features
 
 
-def test_stationarity(features: pd.DataFrame) -> dict:
+def test_stationarity(
+    features: pd.DataFrame, adf_significance: float = ADF_SIGNIFICANCE
+) -> Dict[str, Tuple[float | None, float | None, bool]]:
     """Run ADF test on each feature column after dropping warmup NaNs.
 
     Args:
-        features: Feature DataFrame.
+        features (pd.DataFrame): Feature DataFrame.
+        adf_significance (float): P-value threshold for ADF stationarity
+            (must be in range: (0, 1)).
 
     Returns:
-        Dict mapping column name to (adf_stat, p_value, is_stationary).
+        Dict[str, Tuple[float|None, float|None, bool]]: Mapping of column names
+            to (adf_stat, p_value, is_stationary).
     """
+    assert 0 < adf_significance < 1, "adf_significance must be in the range: (0, 1)"
     results = {}
     for col in features.columns:
         clean = features[col].dropna()
@@ -91,22 +100,32 @@ def test_stationarity(features: pd.DataFrame) -> dict:
             results[col] = (None, None, True)
             continue
         stat, pvalue, *_ = adfuller(clean.values, regression="c", autolag="AIC")
-        results[col] = (round(stat, 4), round(pvalue, 6), pvalue < ADF_SIGNIFICANCE)
+        results[col] = (round(stat, 4), round(pvalue, 6), pvalue < adf_significance)
     return results
 
 
 def apply_fractional_differencing(
-    features: pd.DataFrame, stationarity_results: dict
-) -> tuple[pd.DataFrame, dict]:
+    features: pd.DataFrame,
+    stationarity_results: Dict[str, Tuple[float | None, float | None, bool]],
+    adf_significance: float = ADF_SIGNIFICANCE,
+    fracdiff_window: int = FRACDIFF_WINDOW,
+    logging: bool = True,
+) -> Tuple[pd.DataFrame, Dict]:
     """Apply fractional differencing to non-stationary features.
 
     Args:
-        features: Feature DataFrame.
-        stationarity_results: Output from test_stationarity().
+        features (pd.DataFrame): Feature DataFrame.
+        stationarity_results (dict): Output from test_stationarity().
+        adf_significance (float): P-value threshold for ADF stationarity
+            (must be in range: (0, 1)).
+        fracdiff_window (int): Fixed-width window for fractional weights.
+        logging (bool): toggle to enable terminal output.
 
     Returns:
-        Tuple of (differenced DataFrame, dict of d values per feature).
+        tuple[pd.DataFrame, dict]: Tuple of (differenced DataFrame, dict of d values).
     """
+    assert 0 < adf_significance < 1, "adf_significance must be in the range: (0, 1)"
+    assert fracdiff_window > 0, "fracdiff_window must be a positive integer"
     d_values = {}
     result = features.copy()
 
@@ -115,41 +134,51 @@ def apply_fractional_differencing(
     ]
 
     if not non_stationary:
-        print("  All features are already stationary — no differencing needed.")
+        if logging:
+            print("  All features are already stationary — no differencing needed.")
         return result, d_values
 
-    print(f"  Non-stationary features requiring differencing: {non_stationary}")
+    if logging:
+        print(f"  Non-stationary features requiring differencing: {non_stationary}")
 
     for col in non_stationary:
         d = find_min_d(
             features[col],
-            significance=ADF_SIGNIFICANCE,
-            window=FRACDIFF_WINDOW,
+            significance=adf_significance,
+            window=fracdiff_window,
         )
         d_values[col] = d
-        print(f"    {col}: optimal d = {d}")
+        if logging:
+            print(f"    {col}: optimal d = {d}")
 
         if d > 0:
-            result[col] = frac_diff(features[col], d, window=FRACDIFF_WINDOW)
+            result[col] = frac_diff(features[col], d, window=fracdiff_window)
 
     return result, d_values
 
 
-def check_correlations(features: pd.DataFrame) -> list:
+def check_correlations(
+    features: pd.DataFrame, correlation_threshold: float = CORRELATION_THRESHOLD
+) -> List[Tuple]:
     """Find feature pairs with correlation above threshold.
 
     Args:
-        features: Feature DataFrame (NaNs already dropped).
+        features (pd.DataFrame): Feature DataFrame (NaNs already dropped).
+        correlation_threshold (float): Absolute correlation limit
+            (must be in range: [0, 1)).
 
     Returns:
-        List of (col1, col2, correlation) tuples exceeding threshold.
+        List[Tuple]: List of (col1, col2, correlation) tuples exceeding threshold.
     """
+    assert (
+        0 <= correlation_threshold < 1
+    ), "correlation_threshold must be in the range: [0, 1)"
     corr = features.corr().abs()
     high_corr = []
 
     for i in range(len(corr.columns)):
         for j in range(i + 1, len(corr.columns)):
-            if corr.iloc[i, j] > CORRELATION_THRESHOLD:
+            if corr.iloc[i, j] > correlation_threshold:
                 high_corr.append(
                     (corr.columns[i], corr.columns[j], round(corr.iloc[i, j], 4))
                 )
