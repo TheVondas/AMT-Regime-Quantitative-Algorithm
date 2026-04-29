@@ -56,18 +56,18 @@ def compute_rsi(close: pd.Series, period: int = 14) -> pd.Series:
     """Relative Strength Index — ratio of recent gains to total moves, scaled 0-100.
 
     Args:
-        close: Daily closing prices.
-        period: Lookback window in trading days.
+        close (pd.Series): Daily closing prices.
+        period (int): Lookback window in trading days (default 14).
 
     Returns:
-        RSI values as a Series (0-100 scale).
+        pd.Series: RSI values as a Series (0-100 scale).
     """
 ```
 
 Include:
 - One-line description of what the function does
-- `Args:` section listing each parameter and its meaning
-- `Returns:` section describing the output
+- `Args:` section listing each parameter with its type and its meaning
+- `Returns:` section describing the output and its type
 - Any important context about interpretation or caveats (e.g., stationarity concerns, scale)
 
 **Inline comments** — use sparingly, only where the logic is not self-evident. Well-named functions and variables should make most code readable without comments.
