@@ -29,15 +29,14 @@ def test_load_raw_lowercases_columns(tmp_path):
     file_path = tmp_path / "test.parquet"
     df.to_parquet(file_path)
 
-    with patch("src.data.clean.RAW_DIR", tmp_path):
-        result = load_raw("test.parquet")
-        assert list(result.columns) == ["close", "volume"]
+    result = load_raw("test.parquet", tmp_path)
+    assert list(result.columns) == ["close", "volume"]
 
 
 def test_build_daily_alignment_and_log_returns(spy_raw, vix_raw):
     """Verify join logic, forward fill, and log return calculation."""
 
-    def side_effect(filename):
+    def side_effect(filename, raw_dir=None):
         if "spy" in filename:
             return spy_raw.copy()
         return vix_raw.copy()

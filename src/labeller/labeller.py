@@ -34,6 +34,8 @@ KAMA+MSR is the v2 upgrade path (see Decision Log).
 All labels are computed from the daily DataFrame in data/processed/daily.parquet.
 """
 
+from typing import Dict
+
 import pandas as pd
 
 # Regime label constants
@@ -44,7 +46,7 @@ DISTRIBUTION = 3
 ACCUMULATION = 4
 TRANSITION = 5
 
-REGIME_NAMES = {
+REGIME_NAMES: Dict[int, str] = {
     TRENDING_UP: "Trending Up",
     TRENDING_DOWN: "Trending Down",
     RANGING_NEUTRAL: "Ranging Neutral",
@@ -55,7 +57,11 @@ REGIME_NAMES = {
 
 
 def compute_kama(
-    close: pd.Series, n: int = 10, n_s: int = 2, n_l: int = 30
+    close: pd.Series,
+    n: int = 10,
+    n_s: int = 2,
+    n_l: int = 30,
+    eps: float = 1e-10,
 ) -> pd.Series:
     """Kaufman's Adaptive Moving Average — adapts speed to market efficiency.
 
@@ -64,14 +70,23 @@ def compute_kama(
     moves, avoiding whipsaw signals.
 
     Args:
-        close: Daily closing prices.
-        n: Efficiency ratio lookback window (trading days).
-        n_s: Fast smoothing period (used when trending).
-        n_l: Slow smoothing period (used when ranging).
+        close (pd.Series): Daily closing prices.
+        n (int): Efficiency ratio lookback window (trading days).
+        n_s (int): Fast smoothing period (used when trending).
+        n_l (int): Slow smoothing period (used when ranging).
+        eps (float): Arbitrarily small number where eps > 0.
+            Used to avoid division by zero.
 
     Returns:
-        KAMA values as a Series, same index as input.
+        pd.Series: KAMA values, same index as input.
     """
+    assert n > 0, f"n ({n}) must be a positive integer."
+    assert (
+        0 < n_s < n_l
+    ), f"n_s ({n_s}) must be a positive integer less than n_l ({n_l})."
+    assert (
+        0 < eps < 1e-2
+    ), f"eps ({eps}) must be an arbitrarily small number > 0. In range: (0, 1e-2)"
     fast_sc = 2.0 / (n_s + 1)
     slow_sc = 2.0 / (n_l + 1)
 
@@ -79,7 +94,7 @@ def compute_kama(
     direction = (close - close.shift(n)).abs()
     volatility = close.diff().abs().rolling(window=n).sum()
     # Avoid division by zero on perfectly flat segments
-    er = direction / volatility.clip(lower=1e-10)
+    er = direction / volatility.clip(lower=eps)
 
     # Smoothing constant: maps ER onto [slow_sc, fast_sc], then squares
     sc = (er * (fast_sc - slow_sc) + slow_sc) ** 2
@@ -104,6 +119,7 @@ def detect_trend(
     slope_window: int = 5,
     dead_zone_pct: float = 0.01,
     min_slope_pct: float = 0.003,
+    eps: float = 1e-10,
 ) -> pd.Series:
     """Detect trend direction from KAMA position and slope.
 
@@ -116,19 +132,33 @@ def detect_trend(
     directional. Both thresholds are normalised to price level.
 
     Args:
-        close: Daily closing prices.
-        kama: KAMA values (from compute_kama).
-        slope_window: Number of days to measure KAMA slope over.
-        dead_zone_pct: Minimum fractional distance from KAMA to classify
+        close (pd.Series): Daily closing prices.
+        kama (pd.Series): KAMA values (from compute_kama).
+        slope_window (int): Number of days to measure KAMA slope over (default 5).
+        dead_zone_pct (float): Minimum fractional distance from KAMA to classify
             as trending (default 1% — median close-to-KAMA distance).
-        min_slope_pct: Minimum fractional KAMA slope per slope_window
+        min_slope_pct (float): Minimum fractional KAMA slope per slope_window
             to classify as directional (default 0.3%).
+        eps (float): Arbitrarily small number where eps > 0.
+            Used to avoid division by zero.
 
     Returns:
-        Series with values: 1 (up), -1 (down), 0 (no trend).
+        pd.Series: Series with values: 1 (up), -1 (down), 0 (no trend).
     """
+    assert (
+        slope_window > 0
+    ), f"slope_window ({slope_window}) must be a positive integer."
+    assert (
+        0 < eps < 1e-2
+    ), f"eps ({eps}) must be an arbitrarily small number > 0. In range: (0, 1e-2)."
+    assert (
+        0 < min_slope_pct < 1
+    ), f"min_slope_pct ({min_slope_pct}) must be in range: (0, 1)."
+    assert (
+        0 < dead_zone_pct < 1
+    ), f"dead_zone_pct ({dead_zone_pct}) must be in range: (0, 1)."
     # Normalised KAMA slope
-    kama_slope_norm = (kama - kama.shift(slope_window)) / kama.clip(lower=1e-10)
+    kama_slope_norm = (kama - kama.shift(slope_window)) / kama.clip(lower=eps)
 
     # Price position relative to KAMA with dead zone
     above_band = close > kama * (1 + dead_zone_pct)
@@ -163,17 +193,22 @@ def detect_volatility(
     volatility triggers the high-vol flag.
 
     Args:
-        high: Daily high prices.
-        low: Daily low prices.
-        close: Daily closing prices.
-        atr_period: ATR lookback period.
-        avg_period: SMA period for ATR average.
-        vol_threshold: Multiplier for ATR average to trigger high-vol
+        high (pd.Series): Daily high prices.
+        low (pd.Series): Daily low prices.
+        close (pd.Series): Daily closing prices.
+        atr_period (int): ATR lookback period.
+        avg_period (int): SMA period for ATR average.
+        vol_threshold (float): Multiplier for ATR average to trigger high-vol
             classification (default 1.1 = ATR must be 10% above average).
 
     Returns:
-        Series with values: 1 (high vol), 0 (low vol).
+        pd.Series: with values: 1 (high vol), 0 (low vol).
     """
+    assert atr_period > 0, f"atr_period ({atr_period}) must be a positive integer."
+    assert avg_period > 0, f"atr_period ({avg_period}) must be a positive integer."
+    assert (
+        vol_threshold >= 1.0
+    ), f"vol_threshold ({vol_threshold}) must be at least 1.0."
     # True Range
     tr1 = high - low
     tr2 = (high - close.shift(1)).abs()
@@ -202,11 +237,11 @@ def assign_base_states(trend: pd.Series, high_vol: pd.Series) -> pd.Series:
     indicates a ranging/balance market.
 
     Args:
-        trend: Trend direction series (1, -1, 0).
-        high_vol: Volatility regime series (1, 0).
+        trend (pd.Series): Trend direction series (1, -1, 0).
+        high_vol (pd.Series): Volatility regime series (1, 0).
 
     Returns:
-        Series with base regime labels.
+        pd.Series: with base regime labels.
     """
     state = pd.Series(RANGING_NEUTRAL, index=trend.index, dtype=int)
 
@@ -240,15 +275,19 @@ def add_prior_context(
     with trend=-1 but high vol that became Transition in base states).
 
     Args:
-        base_states: Base regime labels from assign_base_states.
-        trend: Raw trend direction series (1, -1, 0) from detect_trend.
-        prior_window: Number of days to look back for prior context.
-        dominance_pct: Fraction of prior window that must show directional
+        base_states (pd.Series): Base regime labels from assign_base_states.
+        trend (pd.Series): Raw trend direction series (1, -1, 0) from detect_trend.
+        prior_window (int): Number of days to look back for prior context.
+        dominance_pct (float): Fraction of prior window that must show directional
             trend to qualify (default 30%).
 
     Returns:
-        Series with 6 refined regime labels.
+        pd.Series: 6 refined regime labels.
     """
+    assert prior_window > 0, f"prior_window ({prior_window}) must be positive."
+    assert (
+        0 < dominance_pct < 1
+    ), f"dominance_pct ({dominance_pct}) must be in range: (0, 1)."
     refined = base_states.copy()
     threshold = prior_window * dominance_pct
 
@@ -280,12 +319,13 @@ def apply_min_duration(labels: pd.Series, min_days: int = 5) -> pd.Series:
     smoothing pass forward-fills regimes shorter than the minimum.
 
     Args:
-        labels: Regime label series.
-        min_days: Minimum regime duration in trading days.
+        labels (pd.Series): Regime label series.
+        min_days (int): Minimum regime duration in trading days.
 
     Returns:
-        Smoothed regime label series.
+        pd.Series: Smoothed regime label series.
     """
+    assert min_days >= 1, f"min_days ({min_days}) must be at least 1."
     smoothed = labels.copy()
 
     # Identify regime runs
@@ -313,7 +353,20 @@ def apply_min_duration(labels: pd.Series, min_days: int = 5) -> pd.Series:
     return smoothed
 
 
-def build_regime_labels(df: pd.DataFrame) -> pd.DataFrame:
+def build_regime_labels(
+    df: pd.DataFrame,
+    kama_n: int = 10,
+    kama_n_s: int = 2,
+    kama_n_l: int = 30,
+    slope_window: int = 5,
+    dead_zone_pct: float = 0.01,
+    min_slope_pct: float = 0.003,
+    atr_period: int = 14,
+    vol_avg_period: int = 50,
+    vol_threshold: float = 1.1,
+    context_window: int = 20,
+    min_duration: int = 5,
+) -> pd.DataFrame:
     """Build regime labels for every trading day.
 
     Orchestrates the full labelling pipeline:
@@ -321,34 +374,60 @@ def build_regime_labels(df: pd.DataFrame) -> pd.DataFrame:
     prior context → minimum duration filter.
 
     Args:
-        df: Daily DataFrame with 'high', 'low', 'close' columns.
+        df (pd.DataFrame): Daily DataFrame with 'high', 'low', 'close'.
+        kama_n (int): Efficiency ratio lookback window (default 10).
+        kama_n_s (int): KAMA fast smoothing period (default 2).
+        kama_n_l (int): KAMA slow smoothing period (default 30).
+        slope_window (int): Window for measuring KAMA trajectory (default 5).
+        dead_zone_pct (float): Fractional distance from KAMA
+            required to be 'trending' (default 0.01).
+        min_slope_pct (float): Fractional KAMA slope
+            required for directionality (default 3e-3).
+        atr_period (int): Lookback for Average True Range (default 14).
+        vol_avg_period (int): Lookback for the baseline
+            average volatility (default 50).
+        vol_threshold (float): Multiplier for ATR/SMA(ATR)
+            to trigger 'High Vol' (default 1.1).
+        context_window (int): Lookback for identifying
+            Accumulation/Distribution (default 20).
+        min_duration (int): Minimum days a regime must
+            persist to avoid being absorbed (default 5).
 
     Returns:
-        DataFrame with columns:
-          - regime_id: integer regime label (0-5)
-          - regime_label: string regime name
+        pd.DataFrame: With 'regime_id' (int) and 'regime_label' (str).
     """
-    close = df["close"]
-    high = df["high"]
-    low = df["low"]
+    close, high, low = df["close"].copy(), df["high"].copy(), df["low"].copy()
 
     # Step 1: Compute KAMA
-    kama = compute_kama(close, n=10, n_s=2, n_l=30)
+    kama = compute_kama(close, n=kama_n, n_s=kama_n_s, n_l=kama_n_l)
 
     # Step 2: Detect trend direction
-    trend = detect_trend(close, kama, slope_window=5)
+    trend = detect_trend(
+        close,
+        kama,
+        slope_window=slope_window,
+        dead_zone_pct=dead_zone_pct,
+        min_slope_pct=min_slope_pct,
+    )
 
     # Step 3: Detect volatility regime
-    high_vol = detect_volatility(high, low, close, atr_period=14, avg_period=50)
+    high_vol = detect_volatility(
+        high,
+        low,
+        close,
+        atr_period=atr_period,
+        avg_period=vol_avg_period,
+        vol_threshold=vol_threshold,
+    )
 
     # Step 4: Assign base states (4 states + transition)
     base_states = assign_base_states(trend, high_vol)
 
     # Step 5: Refine ranging states with prior context (→ 6 states)
-    refined = add_prior_context(base_states, trend, prior_window=20)
+    refined = add_prior_context(base_states, trend, prior_window=context_window)
 
     # Step 6: Smooth out short-lived regimes
-    labels = apply_min_duration(refined, min_days=5)
+    labels = apply_min_duration(refined, min_days=min_duration)
 
     # Build output DataFrame
     result = pd.DataFrame(index=df.index)

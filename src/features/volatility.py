@@ -11,6 +11,8 @@ The gap between realised and implied is itself informative for regime detection.
 All features are computed from the daily DataFrame in data/processed/daily.parquet.
 """
 
+from typing import Callable, List
+
 import pandas as pd
 from ta.volatility import AverageTrueRange
 
@@ -33,15 +35,16 @@ def compute_atr(
     and breakout/transition regimes show rapidly expanding ATR.
 
     Args:
-        high: Daily high prices.
-        low: Daily low prices.
-        close: Daily closing prices.
-        period: Lookback window in trading days.
+        high (pd.Series): Daily high prices.
+        low (pd.Series): Daily low prices.
+        close (pd.Series): Daily closing prices.
+        period (int): Lookback window in trading days (default 14).
 
     Returns:
-        ATR values as a Series, expressed as percentage of close price
+        pd.Series: ATR values, expressed as percentage of close price
         for comparability across the full price history.
     """
+    assert period > 0, f"period ({period}) must be a positive integer."
     atr = AverageTrueRange(high=high, low=low, close=close, window=period)
     # Express as percentage of close so ATR is comparable
     # across 20 years ($80 SPY in 2005 vs $650 in 2026)
@@ -56,12 +59,13 @@ def compute_rolling_std(log_returns: pd.Series, period: int) -> pd.Series:
     high ATR but low rolling std.
 
     Args:
-        log_returns: Daily log returns series.
-        period: Rolling window in trading days.
+        log_returns (pd.Series): Daily log returns series.
+        period (int): Rolling window in trading days.
 
     Returns:
-        Rolling standard deviation as a Series (daily scale, not annualised).
+        pd.Series: Rolling standard deviation as a Series (daily scale, not annualised).
     """
+    assert period > 0, f"period ({period}) must be a positive integer."
     return log_returns.rolling(window=period).std()
 
 
@@ -76,12 +80,13 @@ def compute_vix_change(vix: pd.Series, period: int = 5) -> pd.Series:
     or ranging regimes into trending-down or breakout.
 
     Args:
-        vix: Daily VIX closing values.
-        period: Lookback period in trading days.
+        vix (pd.Series): Daily VIX closing values.
+        period (int): Lookback period in trading days.
 
     Returns:
-        Absolute change in VIX over the period.
+        pd.Series: Absolute change in VIX over the period.
     """
+    assert period > 0, f"period ({period}) must be a positive integer."
     return vix.diff(period)
 
 
@@ -94,48 +99,116 @@ def compute_vix_pct_change(vix: pd.Series, period: int = 5) -> pd.Series:
     normalises for this, making it more informative for regime detection.
 
     Args:
-        vix: Daily VIX closing values.
-        period: Lookback period in trading days.
+        vix (pd.Series): Daily VIX closing values.
+        period (int): Lookback period in trading days.
 
     Returns:
-        Percentage change in VIX over the period (decimal, not multiplied by 100).
+        pd.Series: Percentage change in VIX over the period
+            (decimal, not multiplied by 100).
     """
+    assert period > 0, f"period ({period}) must be a positive integer."
     return vix.pct_change(period)
 
 
-def build_volatility_features(df: pd.DataFrame) -> pd.DataFrame:
+def _compute_for_periods(
+    period: List[int] | int,
+    compute_func: Callable[[int], pd.Series],
+    feat_name: str,
+    suffix: str = "",
+    index: pd.Index = None,
+) -> pd.DataFrame:
+    """Helper to map a compute function over multiple lookback periods.
+
+    Args:
+        periods (List[int] | int): Lookback window(s).
+        compute_func (Callable): Function taking (int period) -> Series.
+        feat_name (str): Prefix for the column name.
+        suffix (str): Suffix to append after the period (e.g., '_pct').
+        index (pd.Index): Index for the resulting DataFrame.
+
+    Returns:
+        pd.DataFrame: DataFrame with columns named '{feat_name}_{p}{suffix}'.
+    """
+    if isinstance(period, int):
+        assert period > 0, f"{feat_name}_period ({period}) must be a positive integer."
+        period = [period]
+
+    computations = pd.DataFrame(index=index)
+    visited = set()
+
+    for p in period:
+        if p in visited:
+            continue
+        assert p > 0, f"Period must be positive. Found {p} for {feat_name}_period."
+        col_name = f"{feat_name}_{p}{suffix}"
+        computations[col_name] = compute_func(p)
+        visited.add(p)
+
+    return computations
+
+
+def build_volatility_features(
+    df: pd.DataFrame,
+    atr_periods: List[int] | int = [14, 30],
+    rolling_std_periods: List[int] | int = [20, 60],
+    vix_change_periods: List[int] | int = 5,
+) -> pd.DataFrame:
     """Build all volatility features from the daily DataFrame.
 
     Args:
-        df: Daily DataFrame with 'high', 'low', 'close', 'log_return',
-            and 'vix' columns.
+        df (pd.DataFrame): Daily DataFrame with 'high', 'low', 'close',
+            'log_return', and 'vix'.
+        atr_periods (List[int] | int): Lookbacks for ATR.
+        rolling_std_periods (List[int] | int): Lookbacks for Realized Vol.
+        vix_change_periods (List[int] | int): Lookbacks for VIX changes.
 
     Returns:
-        DataFrame with volatility feature columns, same index as input.
-        Columns: atr_14_pct, atr_30_pct, rolling_std_20, rolling_std_60,
-                 vix, vix_change_5d, vix_pct_change_5d.
+        pd.DataFrame: Volatility features with dynamic column names:
+            - atr_{p}_pct
+            - rolling_std_{p}
+            - vix (passthrough)
+            - vix_change_{p}d
+            - vix_pct_change_{p}d
     """
-    high = df["high"]
-    low = df["low"]
-    close = df["close"]
-    log_returns = df["log_return"]
-    vix = df["vix"]
+    high, low, close = df["high"].copy(), df["low"].copy(), df["close"].copy()
+    log_returns, vix = df["log_return"].copy(), df["vix"].copy()
 
     features = pd.DataFrame(index=df.index)
 
     # ATR as percentage of close (14-day and 30-day)
-    features["atr_14_pct"] = compute_atr(high, low, close, period=14)
-    features["atr_30_pct"] = compute_atr(high, low, close, period=30)
+    atr_df = _compute_for_periods(
+        period=atr_periods,
+        compute_func=lambda p: compute_atr(high, low, close, p),
+        feat_name="atr",
+        suffix="_pct",
+        index=df.index,
+    )
 
-    # Rolling standard deviation of log returns (20-day and 60-day)
-    features["rolling_std_20"] = compute_rolling_std(log_returns, period=20)
-    features["rolling_std_60"] = compute_rolling_std(log_returns, period=60)
+    # Rolling standard deviation of log returns
+    std_df = _compute_for_periods(
+        period=rolling_std_periods,
+        compute_func=lambda p: compute_rolling_std(log_returns, p),
+        feat_name="rolling_std",
+        index=df.index,
+    )
 
-    # VIX level (passthrough from daily data)
+    # VIX Passthrough
     features["vix"] = vix
 
-    # VIX 5-day change (absolute and percentage)
-    features["vix_change_5d"] = compute_vix_change(vix, period=5)
-    features["vix_pct_change_5d"] = compute_vix_pct_change(vix, period=5)
+    # VIX Changes
+    vix_chg_df = _compute_for_periods(
+        period=vix_change_periods,
+        compute_func=lambda p: compute_vix_change(vix, p),
+        feat_name="vix_change",
+        suffix="d",
+        index=df.index,
+    )
+    vix_pct_df = _compute_for_periods(
+        period=vix_change_periods,
+        compute_func=lambda p: compute_vix_pct_change(vix, p),
+        feat_name="vix_pct_change",
+        suffix="d",
+        index=df.index,
+    )
 
-    return features
+    return pd.concat([features, atr_df, std_df, vix_chg_df, vix_pct_df], axis=1)

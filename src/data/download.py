@@ -35,9 +35,21 @@ RAW_DIR = Path(__file__).resolve().parents[2] / "data" / "raw"
 # ── Download logic ───────────────────────────────────────────────────────────
 
 
-def download_ticker(ticker: str, start: str = START_DATE) -> pd.DataFrame:
-    """Download daily data for a single ticker from yfinance."""
-    print(f"  Downloading {ticker} ...")
+def download_ticker(
+    ticker: str, start: str = START_DATE, logging: bool = True
+) -> pd.DataFrame:
+    """Download daily data for a single ticker from yfinance.
+
+    Args:
+        ticker (str): The yfinance ticker symbol.
+        start (str): Start date in YYYY-MM-DD format.
+        logging (bool): If True, prints status updates to the terminal.
+
+    Returns:
+        pd.DataFrame: Daily market data with a cleaned DatetimeIndex.
+    """
+    if logging:
+        print(f"  Downloading {ticker} ...")
     df = yf.download(ticker, start=start, auto_adjust=True, progress=False)
 
     if df.empty:

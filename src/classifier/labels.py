@@ -32,14 +32,16 @@ def collapse_to_3class(regime_id: pd.Series) -> pd.Series:
     """Collapse 6-regime integer labels into the 3-class baseline.
 
     Args:
-        regime_id: Series of integer regime ids in {0, 1, 2, 3, 4, 5}.
+        regime_id (pd.Series): Series of integer regime ids in {0, 1, 2, 3, 4, 5}.
 
     Returns:
-        Series of integer 3-class labels in {0, 1, 2}, same index as input.
+        pd.Series: Series of integer 3-class labels in {0, 1, 2}, same index as input.
 
     Raises:
-        ValueError: if any value in regime_id is outside {0..5}.
+        ValueError: If regime_id is empty or contains unexpected IDs (outside {0..5}).
     """
+    if regime_id.empty:
+        raise ValueError("Cannot collapse an empty regime series.")
     unknown = set(regime_id.dropna().unique()) - set(_SIX_TO_THREE.keys())
     if unknown:
         raise ValueError(f"Unexpected regime ids: {sorted(unknown)}")

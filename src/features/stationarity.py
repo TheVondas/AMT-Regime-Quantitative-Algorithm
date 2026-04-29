@@ -38,17 +38,18 @@ def compute_rolling_adf(log_returns: pd.Series, window: int = 252) -> pd.DataFra
     have a deterministic time trend.
 
     Args:
-        log_returns: Daily log returns series.
-        window: Rolling window size in trading days. Default 252 (~1 year),
+        log_returns (pd.Series): Daily log returns series.
+        window (int): Rolling window size in trading days. Default 252 (~1 year),
             providing enough data for reliable ADF estimation while still
             capturing regime shifts within the year.
 
     Returns:
-        DataFrame with two columns:
-          - adf_stat_252: ADF test statistic (more negative = more stationary).
-          - adf_pvalue_252: p-value for the null hypothesis of a unit root
+        pd.DataFrame: With two columns:
+          - adf_stat_{window}: ADF test statistic (more negative = more stationary).
+          - adf_pvalue_{window}: p-value for the null hypothesis of a unit root
             (lower = stronger evidence of stationarity).
     """
+    assert window > 0, f"window ({window}) must be a positive integer."
     adf_stats = pd.Series(index=log_returns.index, dtype=float)
     adf_pvalues = pd.Series(index=log_returns.index, dtype=float)
 
@@ -69,20 +70,22 @@ def compute_rolling_adf(log_returns: pd.Series, window: int = 252) -> pd.DataFra
 
     return pd.DataFrame(
         {
-            "adf_stat_252": adf_stats,
-            "adf_pvalue_252": adf_pvalues,
+            f"adf_stat_{window}": adf_stats,
+            f"adf_pvalue_{window}": adf_pvalues,
         }
     )
 
 
-def build_stationarity_features(df: pd.DataFrame) -> pd.DataFrame:
+def build_stationarity_features(
+    df: pd.DataFrame, adf_window: int = 252
+) -> pd.DataFrame:
     """Build all stationarity features from the daily DataFrame.
 
     Args:
-        df: Daily DataFrame with a 'log_return' column.
+        df (pd.DataFrame): Daily DataFrame with a 'log_return' column.
+        adf_window (int): Rolling window size for ADF computation (default 252).
 
     Returns:
-        DataFrame with stationarity feature columns, same index as input.
-        Columns: adf_stat_252, adf_pvalue_252.
+        pd.DataFrame: Combined ADF features with dynamic column names.
     """
-    return compute_rolling_adf(df["log_return"], window=252)
+    return compute_rolling_adf(df["log_return"], window=adf_window)

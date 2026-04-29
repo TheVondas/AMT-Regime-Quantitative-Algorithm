@@ -43,12 +43,14 @@ class Fold:
     """A single walk-forward fold.
 
     Attributes:
-        train_idx: Positional indices into the input DataFrame for training.
-        val_idx: Positional indices into the input DataFrame for validation.
-        train_start: First date in the training window.
-        train_end: Last date in the training window (after purge).
-        val_start: First date in the validation window.
-        val_end: Last date in the validation window.
+        train_idx (np.ndarray): Positional indices into
+            the input DataFrame for training.
+        val_idx (np.ndarray): Positional indices into
+            the input DataFrame for validation.
+        train_start (np.ndarray): First date in the training window.
+        train_end (np.ndarray): Last date in the training window (after purge).
+        val_start (np.ndarry): First date in the validation window.
+        val_end (np.ndarry): Last date in the validation window.
     """
 
     train_idx: np.ndarray
@@ -70,18 +72,19 @@ def walk_forward_splits(
     """Generate walk-forward folds with a 5-day purge between train and val.
 
     Args:
-        index: DatetimeIndex of the dataset being split (e.g. feature matrix).
-        train_start: Earliest date to include in any training fold.
-        holdout_start: First date of the blocked holdout period — no fold may
-            include any data on or after this date.
-        initial_train_years: Years of initial training before the first
+        index (pd.DatetimeIndex): DatetimeIndex of the dataset
+            being split (e.g. feature matrix).
+        train_start (pd.Timestamp): Earliest date to include in any training fold.
+        holdout_start (pd.Timestamp): First date of the blocked holdout period
+            — no fold may include any data on or after this date.
+        initial_train_years (int): Years of initial training before the first
             validation window.
-        val_years: Length of each validation window in years.
-        purge_days: Trading days to drop from the tail of each training
+        val_years (int): Length of each validation window in years.
+        purge_days (int): Trading days to drop from the tail of each training
             window before the validation window begins.
 
     Returns:
-        Ordered list of Fold records, each yielding positional indices.
+        List[Fold]: Ordered list of Fold records, each yielding positional indices.
 
     Raises:
         ValueError: if the index is not monotonic, not a DatetimeIndex, or

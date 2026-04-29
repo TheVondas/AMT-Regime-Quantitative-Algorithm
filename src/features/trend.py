@@ -33,14 +33,16 @@ def compute_adx(
       - -DI > +DI: sellers dominating
 
     Args:
-        high: Daily high prices.
-        low: Daily low prices.
-        close: Daily closing prices.
-        period: Lookback window in trading days.
+        high (pd.Series): Daily high prices.
+        low (pd.Series): Daily low prices.
+        close (pd.Series): Daily closing prices.
+        period (pd.Series): Lookback window in trading days (default 14).
 
     Returns:
-        DataFrame with columns: adx_14, plus_di_14, minus_di_14.
+        pd.DataFrame: With columns
+            "adx_{period}", "plus_di_{period}", "minus_di_{period}".
     """
+    assert period > 0, f"adx period ({period}) must be a positive integer."
     indicator = ADXIndicator(high=high, low=low, close=close, window=period)
     return pd.DataFrame(
         {
@@ -60,12 +62,13 @@ def compute_price_sma_ratio(close: pd.Series, period: int) -> pd.Series:
     across the full price history (SPY $80 in 2005 vs $650 in 2026).
 
     Args:
-        close: Daily closing prices.
-        period: SMA lookback window in trading days.
+        close (pd.Series): Daily closing prices.
+        period (int): SMA lookback window in trading days.
 
     Returns:
-        Ratio of close / SMA(period).
+        pd.Series: Ratio of close / SMA(period).
     """
+    assert period > 0, f"SMA period ({period}) must be a positive integer."
     sma = close.rolling(window=period).mean()
     return close / sma
 
@@ -85,44 +88,63 @@ def compute_sma_cross_ratio(
     shifts and acts as an anchor against short-term noise.
 
     Args:
-        close: Daily closing prices.
-        fast: Fast SMA period (default 50).
-        slow: Slow SMA period (default 200).
+        close (pd.Series): Daily closing prices.
+        fast (int): Fast SMA period (default 50).
+        slow (int): Slow SMA period (default 200).
 
     Returns:
-        Ratio of SMA(fast) / SMA(slow).
+        pd.Series: Ratio of SMA(fast) / SMA(slow).
     """
+    assert 0 < fast < slow, (
+        f"fast SMA period ({fast}) must be a positive "
+        f"integer less than slow SMA period ({slow})."
+    )
     sma_fast = close.rolling(window=fast).mean()
     sma_slow = close.rolling(window=slow).mean()
     return sma_fast / sma_slow
 
 
-def build_trend_features(df: pd.DataFrame) -> pd.DataFrame:
+def build_trend_features(
+    df: pd.DataFrame, adx_period: int = 14, sma_fast: int = 50, sma_slow: int = 200
+) -> pd.DataFrame:
     """Build all trend features from the daily DataFrame.
 
     Args:
-        df: Daily DataFrame with 'high', 'low', and 'close' columns.
+        df (pd.DataFrame): Daily DataFrame with 'high', 'low', and 'close' columns.
+        adx_period (int): Lookback window in trading days
+            for adx computation (default 14).
+        sma_fast (int): Fast SMA period for ratio and crossover (default 50).
+        sma_slow (int): Slow SMA period for ratio and crossover (default 200).
 
     Returns:
-        DataFrame with trend feature columns, same index as input.
-        Columns: adx_14, plus_di_14, minus_di_14, price_sma50_ratio,
-                 price_sma200_ratio, sma_cross_ratio.
+        pd.DataFrame: Trend features with dynamic column names:
+            - adx_{adx_period}, plus_di_{adx_period}, minus_di_{adx_period}
+            - price_sma{sma_fast}_ratio
+            - price_sma{sma_slow}_ratio
+            - sma_cross_{sma_fast}_{sma_slow}_ratio
     """
+    assert 0 < sma_fast < sma_slow, (
+        f"fast SMA period ({sma_fast}) must be a positive "
+        f"integer less than slow SMA period ({sma_slow})."
+    )
     close = df["close"]
     high = df["high"]
     low = df["low"]
 
     features = pd.DataFrame(index=df.index)
 
-    # ADX and Directional Indicators (14-day)
-    adx_df = compute_adx(high, low, close, period=14)
+    # ADX and Directional Indicators
+    adx_df = compute_adx(high, low, close, period=adx_period)
     features = pd.concat([features, adx_df], axis=1)
 
-    # Price relative to SMA(50) and SMA(200)
-    features["price_sma50_ratio"] = compute_price_sma_ratio(close, period=50)
-    features["price_sma200_ratio"] = compute_price_sma_ratio(close, period=200)
+    # Price relative to SMA(sma_period_fast) and SMA(sma_period_slow)
+    sma_fast_ratio = compute_price_sma_ratio(close, period=sma_fast)
+    sma_slow_ratio = compute_price_sma_ratio(close, period=sma_slow)
 
-    # SMA(50) / SMA(200) crossover ratio
-    features["sma_cross_ratio"] = compute_sma_cross_ratio(close)
+    features[f"price_sma{sma_fast}_ratio"] = sma_fast_ratio
+    features[f"price_sma{sma_slow}_ratio"] = sma_slow_ratio
+
+    # SMA(sma_period_fast) / SMA(sma_period_slow) crossover ratio
+    features["sma_cross_ratio"] = sma_slow_ratio / sma_fast_ratio
 
     return features
