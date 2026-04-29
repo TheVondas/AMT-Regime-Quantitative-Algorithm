@@ -447,3 +447,18 @@ Stage 1, Week 4 in progress. Baseline classifier infrastructure now in place: 6â
 - Prioritising realism in mock fixtures improves the "integrity" of the tests and provides better visual validation for the regime mapping logic.
 - The labeller engine now has a baseline "Safety Net," though coverage should be expanded as the regime-shifting rules become more complex.
 - Walk-forward splits now have automated verification that the 5-day purge gap is consistently applied, preventing information leakage.
+
+### 2026-04-29 - Session 22: Universal Library Refactor & Standardisation
+**What was done:**
+- Performed a top-to-bottom refactor of all modules across `src/data`, `src/features`, `src/labeller`, and `src/classifier` to standardise the codebase to a modular baseline.
+- Converted all hardcoded constants and "magic numbers" into explicit input parameters, enabling full external control over lookback windows and thresholds for future optimisation.
+- Implemented strong typing for all methods and object docstrings, explicitly defining argument and return types to improve IDE linting, type safety, and developer clarity.
+- Updated `SESSION_WORKFLOW.md` to codify the requirement for strongly typed docstrings as a mandatory standard for all future methods and objects.
+- Integrated comprehensive assertions across every library to enforce logical constraints at the point of entry, ensuring data integrity before expensive computations begin.
+- Rewrote/tweaked several algorithms throughout the codebase to improve their *Big O* time and memory complexity.
+- Resolved various test regressions triggered by updated method signatures, ensuring the data and feature test suites are synchronised with the new modular architecture.
+
+**Key takeaways:**
+- Decoupling logic from parameters is a prerequisite for hyperparameter optimisation; the system is no longer "locked" to specific hardcoded windows or thresholds. This allows for greater experimentation later down the line.
+- Enforcing strong typing in docstrings and implementing robust assertions significantly reduces the "debugging loop" by catching type mismatches and logic errors immediately. These combine to create a friendly dev interface with easy-to-locate errors.
+- Default values for new input parameters create the exact same output as previously. (i.e. all current run scripts produce the same output as they did before).
